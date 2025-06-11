@@ -15,22 +15,22 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.T_out_handle = None
         self.T_in_handle = None
         self.prev_min = -1
-        self.zone = "THERMAL ZONE: STORY 5 SOUTH PERIMETER SPACE"
-        self.state_buffer = deque(maxlen=12)
+        self.zone = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"
+        self.state_buffer = deque(maxlen=12)  # Store 12 timesteps (10-minute interval → 2 hours)
 
-        self.use_fixed_setpoint = False  # 🔵 Fixed Setpoint Mode 여부
-        self.fixed_setpoint_value = 25  # 🔵 Fixed Setpoint 값 (°C)
+        self.use_fixed_setpoint = False
+        self.fixed_setpoint_value = 25
 
-        # 🔵 로그 디렉토리 및 파일 설정
+        # Logging setup
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-        base_dir = os.path.abspath(os.path.dirname(__file__))  # 현재 .py 파일 위치
+        base_dir = os.path.abspath(os.path.dirname(__file__))
         self.log_dir = os.path.join(base_dir, "logs")
         os.makedirs(self.log_dir, exist_ok=True)
 
         if self.use_fixed_setpoint:
-            fixed_str = str(round(self.fixed_setpoint_value, 1)).replace('.', '')  # 예: 23.3 -> '233'
+            fixed_str = str(round(self.fixed_setpoint_value, 1)).replace('.', '')
             filename = f"phi_gpt_log_fixed{fixed_str}_{timestamp}.csv"
         else:
             filename = f"phi_gpt_log_{timestamp}.csv"
@@ -77,22 +77,28 @@ class phiGPTSimulator(EnergyPlusPlugin):
             return 0
         self.prev_min = minute
 
-        if minute not in (0, 30):
-            return 0
-
+        # Update state buffer every 10 minutes
         T_out = self.api.exchange.get_variable_value(state, self.T_out_handle)
         T_in = self.api.exchange.get_variable_value(state, self.T_in_handle)
         T_set = self.api.exchange.get_actuator_value(state, self.cooling_handle)
 
         self.state_buffer.append((T_out, T_in, T_set))
+
+        # Only perform control every 30 minutes (minute == 0 or 30)
+        if minute not in (0, 30):
+            return 0
+
+        # Skip control if buffer is not yet filled
         if len(self.state_buffer) < 12:
             self.api.runtime.issue_warning(state, f"[phiGPT] Buffering... ({len(self.state_buffer)}/12)")
             return 0
 
+        # Fixed setpoint control (for debugging or baseline)
         if self.use_fixed_setpoint:
             new_setpoint_c = self.fixed_setpoint_value
             reason = "Fixed setpoint mode (no LLM reasoning)"
         else:
+            # Call external reasoning server with state history
             response = self.query_reasoning_server(list(self.state_buffer))
             if response and "optimal_cooling_setpoint" in response:
                 new_setpoint_c = response["optimal_cooling_setpoint"]
@@ -102,10 +108,11 @@ class phiGPTSimulator(EnergyPlusPlugin):
                 reason = "No valid response"
                 return 0
 
+        # Apply the new cooling setpoint
         self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
         self.api.runtime.issue_warning(state, f"[phiGPT] {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
 
-        # 🟢 EnergyPlus 시뮬레이션 시간 기반 날짜 정보 추출
+        # Log the control event
         month = self.api.exchange.month(state)
         day = self.api.exchange.day_of_month(state)
 
@@ -140,6 +147,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
 
+        # Notify reasoning server to shut down
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(("127.0.0.1", 55555))
@@ -150,6 +158,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
         except Exception as e:
             print(f"[phiGPTSimulator] ⚠️ Failed to send shutdown signal: {e}")
 
+        # Save EnergyPlus socket outputs (used for post-analysis)
         if self.use_fixed_setpoint:
             fixed_str = str(round(self.fixed_setpoint_value, 1)).replace('.', '')
             socket_dst = os.path.join(self.log_dir, f"socket_fixed{fixed_str}_{timestamp}.csv")
