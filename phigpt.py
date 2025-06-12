@@ -8,6 +8,9 @@ import numpy as np
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+from feedback_simulator import run_feedback_simulation
+import itertools
+import random
 
 # LangChain components
 from langchain.vectorstores.faiss import FAISS as FAISSBase
@@ -36,12 +39,13 @@ class phiGPTGenerator:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        self.target_temp = 23.0
 
     def _call_chat_api(self, prompt_text: str) -> str:
         payload = {
             "model": self.model_name,
             "stream": False,
-            "messages": [ {"role": "user", "content": prompt_text} ]
+            "messages": [{"role": "user", "content": prompt_text}]
         }
         response = requests.post(
             f"{self.api_base}/chat/completions",
@@ -49,69 +53,166 @@ class phiGPTGenerator:
             json=payload
         )
         response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"].strip()
+        return response.json()["choices"][0]["message"]["content"].strip()
+
+    def extract_json_from_text(self, text: str) -> dict:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        raise ValueError("No JSON object found in text.")
 
     def generate_response_from_prompt(self, prompt_text: str, ts_knowledge=None, pdf_summary=None):
-        print(f"📥 Sending prompt to model '{self.model_name}' ({len(prompt_text)} characters)")
         while True:
             try:
                 reply = self._call_chat_api(prompt_text)
-                print(f"📤 Received reply ({len(reply)} characters)")
-
                 try:
                     result_json = json.loads(reply)
                 except json.JSONDecodeError:
-                    print("⚠️ Raw response contains extra text. Attempting to extract JSON...")
                     result_json = self.extract_json_from_text(reply)
-                    print(f"✅ Extracted JSON: {result_json}")
 
                 if (
-                    isinstance(result_json, dict) and
-                    "optimal_cooling_setpoint" in result_json and
-                    isinstance(result_json["optimal_cooling_setpoint"], (int, float)) and
-                    "reason" in result_json and
-                    isinstance(result_json["reason"], str)
+                    isinstance(result_json, dict)
+                    and "optimal_cooling_setpoints" in result_json
+                    and isinstance(result_json["optimal_cooling_setpoints"], list)
+                    and len(result_json["optimal_cooling_setpoints"]) == 4
+                    and all(isinstance(x, (int, float)) for x in result_json["optimal_cooling_setpoints"])
+                    and "reason" in result_json
                 ):
-                    log_dir = "phigpt_json_logs"
-                    os.makedirs(log_dir, exist_ok=True)
+                    applied_setpoint = result_json["optimal_cooling_setpoints"][0]
+
+                    now = datetime.now()
+                    log_path = f"phigpt_json_logs/setpoint_log_{now.strftime('%Y%m%d_%H%M%S')}.jsonl"
+                    os.makedirs("phigpt_json_logs", exist_ok=True)
 
                     log_entry = {
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": now.isoformat(),
                         "prompt": prompt_text,
-                        "retrieved_time_series": ts_knowledge,
-                        "retrieved_text": pdf_summary,
-                        "optimal_cooling_setpoint": result_json["optimal_cooling_setpoint"],
+                        "retrieved_time_series": ts_knowledge or {},
+                        "retrieved_text": pdf_summary or "",
+                        "optimal_cooling_setpoints": result_json["optimal_cooling_setpoints"],
+                        "applied_setpoint": applied_setpoint,
                         "reason": result_json["reason"]
                     }
 
-                    log_path = os.path.join(log_dir, "setpoint_log.jsonl")
-                    with open(log_path, "a") as f:
+                    with open(log_path, "w") as f:
                         f.write(json.dumps(log_entry) + "\n")
 
                     result_json.update({
                         "prompt_text": prompt_text,
                         "retrieved_time_series": ts_knowledge,
-                        "retrieved_text": pdf_summary
+                        "retrieved_text": pdf_summary,
+                        "applied_setpoint": applied_setpoint,
+                        "log_path": log_path
                     })
 
                     return result_json
                 else:
-                    raise ValueError("Invalid JSON structure")
+                    raise ValueError("Invalid JSON response format.")
 
             except Exception as e:
-                print(f"⚠️ Error generating response: {e}. Retrying in 1s...")
+                print(f"⚠️ Error: {e}, retrying in 1s...")
                 time.sleep(1)
 
-    def extract_json_from_text(self, text: str) -> dict:
-        try:
-            match = re.search(r"\{.*\}", text, re.DOTALL)
-            if match:
-                return json.loads(match.group(0))
-            raise ValueError("No JSON object found in text.")
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse JSON: {e}")
+    def generate_response_with_feedback(
+        self, prompt_text: str, ts_knowledge=None, pdf_summary=None,
+        log_path: str = "./logs/phi_gpt_log_test.csv",
+        zone_name: str = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"
+    ):
+        result = self.generate_response_from_prompt(prompt_text, ts_knowledge, pdf_summary)
+        setpoints = result["optimal_cooling_setpoints"]
+        feedback_df = run_feedback_simulation(setpoints, log_path, zone_name)
 
+        comfort_sum = (feedback_df["T_in"] - self.target_temp).abs().sum() if "T_in" in feedback_df else None
+        feedback_metrics = {
+            "energy_total_J": feedback_df["Energy_J"].sum() if "Energy_J" in feedback_df else None,
+            "comfort_violation_sum": comfort_sum
+        }
+
+        return {
+            "llm_result": result,
+            "feedback_df": feedback_df,
+            "metrics": feedback_metrics
+        }
+
+    def optimize_setpoints_with_textgrad(
+        self,
+        prompt_text: str,
+        ts_knowledge=None,
+        pdf_summary=None,
+        log_path="./logs/phi_gpt_log_test.csv",
+        zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
+        max_iters=5
+    ):
+        def evaluate(setpoints):
+            feedback_df = run_feedback_simulation(setpoints, log_path, zone_name)
+            energy = feedback_df["Energy_J"].sum() if "Energy_J" in feedback_df else float("inf")
+            comfort = (feedback_df["T_in"] - self.target_temp).abs().sum() if "T_in" in feedback_df else float("inf")
+            return energy + comfort, feedback_df
+
+        def generate_candidates(base, exploration_n=5):
+            allowed = [22.0, 23.0, 24.0]
+            neighbors = []
+
+            # depth-1: single-site perturb
+            for i in range(4):
+                for delta in [-1, 1]:
+                    val = base[i] + delta
+                    if val in allowed:
+                        new = base[:]
+                        new[i] = val
+                        neighbors.append(new)
+
+            # # depth-2: pair-site perturb
+            # for i, j in itertools.combinations(range(4), 2):
+            #     for d1 in [-1, 1]:
+            #         for d2 in [-1, 1]:
+            #             vi, vj = base[i] + d1, base[j] + d2
+            #             if vi in allowed and vj in allowed:
+            #                 new = base[:]
+            #                 new[i] = vi
+            #                 new[j] = vj
+            #                 neighbors.append(new)
+
+            # random full candidates
+            rand_set = random.sample(list(itertools.product(allowed, repeat=4)), exploration_n)
+            neighbors.extend([list(r) for r in rand_set])
+
+            # deduplicate
+            return [list(t) for t in {tuple(x) for x in neighbors}]
+
+        print("🧠 Initial generation from LLM...")
+        result = self.generate_response_from_prompt(prompt_text, ts_knowledge, pdf_summary)
+        best_setpoints = result["optimal_cooling_setpoints"]
+        best_score, best_feedback = evaluate(best_setpoints)
+
+        print(f"🔍 Initial score: {best_score:.2f} | setpoints: {best_setpoints}")
+
+        for iteration in range(1, max_iters + 1):
+            print(f"\n🔁 Iteration {iteration}")
+            improved = False
+            for candidate in generate_candidates(best_setpoints):
+                score, _ = evaluate(candidate)
+                print(f"  Candidate {candidate} → Score: {score:.2f}")
+                if score < best_score:
+                    best_setpoints = candidate
+                    best_score = score
+                    improved = True
+                    print(f"  ✅ New best found!")
+
+            if not improved:
+                print("  ❌ No improvement found. Early stopping.")
+                break
+
+        feedback_str = best_feedback.to_string(index=False)
+        improved_prompt = prompt_text + "\n\n---\n\n## Feedback from simulation:\n" + feedback_str
+
+        return {
+            "optimal_cooling_setpoints": best_setpoints,
+            "applied_setpoint": best_setpoints[0],
+            "reason": result["initial_llm_result"].get("reason", "Optimized by TextGrad"),
+            "log_path": result["initial_llm_result"].get("log_path", ""),
+            "improved_prompt": improved_prompt
+        }
 
 class phiGPTRetriever:
     def __init__(
@@ -140,6 +241,8 @@ class phiGPTRetriever:
         self.vectorstore_simulation = FAISSBase.load_local(
             ts_db_path_simulation, self.embeddings, allow_dangerous_deserialization=True
         )
+        self.target_temp = 23.0
+
 
         # 🔒 현재는 measurement vectorstore 사용 안 함
         # self.vectorstore_measurement = FAISSBase.load_local(
@@ -274,13 +377,14 @@ class phiGPTRetriever:
 
         prompt = (
             f"# COOLING Setpoint Optimizer\n\n"
-            f"You are an intelligent agent tasked with optimizing the COOLING setpoint for a building based on time-series HVAC data.\n\n"
+            f"You are an intelligent agent tasked with optimizing the COOLING setpoints for a building based on time-series HVAC data.\n\n"
             "---\n\n"
             "## Objective\n"
-            "Determine the optimal cooling setpoint that:\n"
-            "- Minimizes energy consumption\n"
-            "- Maintains indoor temperature near 25°C\n"
-            "- Adapts to current building and environmental conditions using historical system behavior and expert strategies\n\n"
+            f"Determine the optimal cooling setpoints for the next 4 time steps (t₀ to t₃), each representing a 30-minute interval (totaling 2 hours), that:\n"
+            "- Minimize total cooling energy consumption\n"
+            f"- Maintain indoor temperature close to {self.target_temp:.1f}°C\n"
+            "- Adapt to current building and environmental conditions using historical system behavior and expert strategies\n"
+            "- Take into account the **thermal lag** effect — indoor temperature responds gradually to changes in setpoints.\n\n"
             "---\n\n"
             "## Current System States (Last Few Hours)\n"
             f"{current_states_table}\n\n"
@@ -288,21 +392,22 @@ class phiGPTRetriever:
             "## Retrieved Historical Patterns\n"
             "### Simulation-based Patterns:\n"
             f"{ts_knowledge['simulation']}\n\n"
-
             "---\n\n"
             "## Reference Knowledge from Literature\n"
             "Below is a relevant excerpt from technical documents describing expert-designed cooling setpoint strategies:\n\n"
             f"{retrieved_text.strip() if retrieved_text else 'No relevant documents retrieved.'}\n\n"
             "---\n\n"
             "## Response Instructions\n"
-            "You must now choose the optimal cooling setpoint (24°C, 25°C, or 26°C) and provide a short justification.\n"
-            "Use the historical patterns and the expert strategies above to guide your decision.\n"
-            "Output your result in valid JSON format **only**.\n\n"
+            "Please choose **4 cooling setpoints**, one for each of the next 4 time steps (t₀, t₁, t₂, t₃).\n"
+            "- Each time step corresponds to 30 minutes (2-hour control horizon).\n"
+            "- Choose each setpoint from the options: **[22°C, 23°C, 24°C]**.\n"
+            "- Because of thermal lag, your choices should anticipate future temperature behavior rather than reacting only to the present.\n\n"
+            "Output your result in **valid JSON format** exactly as shown below.\n\n"
             "---\n\n"
             "## Output Format\n"
             "{\n"
-            "  \"optimal_cooling_setpoint\": 25,\n"
-            "  \"reason\": \"Brief explanation of your selection rationale\"\n"
+            "  \"optimal_cooling_setpoints\": [23, 22, 22, 23],\n"
+            "  \"reason\": \"Started with strong cooling due to rising indoor temps, then relaxed as trend stabilizes\"\n"
             "}"
         )
 
@@ -310,4 +415,6 @@ class phiGPTRetriever:
 
     def generate_optimized_setpoint(self, current_states):
         prompt, ts_know, pdf_retrieved = self.build_cooling_prompt(current_states)
-        return self.generator.generate_response_from_prompt(prompt, ts_know, pdf_retrieved)
+        result = self.generator.generate_response_from_prompt(prompt, ts_know, pdf_retrieved)
+        return result["applied_setpoint"]  # ✅ t₀만 실제 제어에 사용
+

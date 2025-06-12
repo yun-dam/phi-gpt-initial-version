@@ -100,9 +100,19 @@ class phiGPTSimulator(EnergyPlusPlugin):
         else:
             # Call external reasoning server with state history
             response = self.query_reasoning_server(list(self.state_buffer))
-            if response and "optimal_cooling_setpoint" in response:
-                new_setpoint_c = response["optimal_cooling_setpoint"]
-                reason = response.get("reason", "N/A")
+
+            if response:
+                # ✅ New format: multi-step setpoints
+                if "optimal_cooling_setpoints" in response:
+                    new_setpoint_c = response["optimal_cooling_setpoints"][0]
+                    reason = response.get("reason", "N/A")
+                # ✅ Old format: single setpoint
+                elif "optimal_cooling_setpoint" in response:
+                    new_setpoint_c = response["optimal_cooling_setpoint"]
+                    reason = response.get("reason", "N/A")
+                else:
+                    self.api.runtime.issue_warning(state, "[phiGPT] ⚠️ No valid setpoint key found in response.")
+                    return 0
             else:
                 self.api.runtime.issue_warning(state, "[phiGPT] ⚠️ No valid response from reasoning server.")
                 reason = "No valid response"

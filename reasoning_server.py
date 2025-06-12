@@ -1,9 +1,10 @@
 import socket
 import json
+import traceback
 from phigpt import phiGPTRetriever
 from phigpt import phiGPTGenerator
 
-# 1) Initialize the retriever with API and database paths
+# 1) Initialize the retriever
 retriever = phiGPTRetriever(
     ts_db_path_simulation=r".\data\timeseries\multiindex_energyplus_data",
     ts_db_path_measurement=r".\data\timeseries\multiindex_energyplus_data",
@@ -14,16 +15,19 @@ retriever = phiGPTRetriever(
     horizon_hours=3
 )
 
-# 2) Initialize the generator with the same API settings
+# 2) Initialize the generator
 generator = phiGPTGenerator(
     api_key_env="AI_API_KEY",
     api_base_url="https://aiapi-prod.stanford.edu/v1",
     model_name="o3-mini"
 )
 
+# Use TextGrad?
+use_textgrad = True
+
 HOST = '127.0.0.1'
 PORT = 55555
-TIMEOUT_SECONDS = 120  # Auto-shutdown if no connection for 60 seconds
+TIMEOUT_SECONDS = 120  # 2 minutes
 
 def handle_request(conn):
     data = conn.recv(8192)
@@ -41,27 +45,50 @@ def handle_request(conn):
         return
 
     try:
-        # Build prompt and call the LLM to get optimal setpoint
+        # 🧠 Prompt 구성
         prompt, ts_know, pdf_sum = retriever.build_cooling_prompt(state_buffer)
-        result = generator.generate_response_from_prompt(prompt, ts_know, pdf_sum)
 
-        # Print current control decision to console
-        print("\n[ReasoningServer] 🔄 Cooling Control Decision at Current Timestep")
-        print(f"> Optimal Setpoint: {result['optimal_cooling_setpoint']}°C")
+        if use_textgrad:
+            print("[ReasoningServer] 🚀 Using TextGrad optimization...")
+            result_raw = generator.optimize_setpoints_with_textgrad(
+                prompt_text=prompt,
+                ts_knowledge=ts_know,
+                pdf_summary=pdf_sum,
+                log_path="./logs/phi_gpt_log_test.csv",
+                zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
+                max_iters=1
+            )
+            result = {
+                "optimal_cooling_setpoints": result_raw["best_setpoints"],
+                "applied_setpoint": result_raw["best_setpoints"][0],
+                "reason": result_raw["initial_llm_result"].get("reason", "Optimized by TextGrad"),
+                "log_path": result_raw["initial_llm_result"].get("log_path", ""),
+                "improved_prompt": result_raw.get("improved_prompt", "")
+            }
+        else:
+            print("[ReasoningServer] ✨ Using single-shot LLM generation...")
+            result = generator.generate_response_from_prompt(prompt, ts_know, pdf_sum)
+
+        # 📢 콘솔 출력
+        print("\n[ReasoningServer] 🔄 Cooling Control Decision (Multi-step)")
+        print(f"> Setpoints (t0~t3): {result['optimal_cooling_setpoints']}")
         print(f"> Reason: {result['reason']}\n")
 
+        # ✅ 최종 응답 (simulator로 전송)
         response = {
-            "optimal_cooling_setpoint": result["optimal_cooling_setpoint"],
+            "optimal_cooling_setpoints": result["optimal_cooling_setpoints"],
+            "applied_setpoint": result["applied_setpoint"],
             "reason": result["reason"]
         }
 
     except Exception as e:
         print("[ReasoningServer] ⚠️ Error during generation:", e)
+        traceback.print_exc()
         response = {"error": str(e)}
 
     conn.sendall(json.dumps(response).encode())
 
-# Main server loop with timeout
+# Main server loop
 with socket.socket() as s:
     s.bind((HOST, PORT))
     s.listen()
