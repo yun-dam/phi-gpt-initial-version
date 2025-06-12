@@ -35,17 +35,19 @@ def handle_request(conn):
         return
     message = json.loads(data.decode())
 
+    # Shutdown signal
     if message.get("shutdown", False):
         conn.sendall(json.dumps({"status": "server shutting down"}).encode())
         return
 
+    # Extract state buffer
     state_buffer = message.get("state_buffer")
     if state_buffer is None:
         conn.sendall(json.dumps({"error": "No state_buffer provided."}).encode())
         return
 
     try:
-        # 🧠 Prompt 구성
+        # 🧠 Build prompt
         prompt, ts_know, pdf_sum = retriever.build_cooling_prompt(state_buffer)
 
         if use_textgrad:
@@ -58,27 +60,28 @@ def handle_request(conn):
                 zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
                 max_iters=1
             )
+            # ← Modified mapping to use the keys returned by optimize_setpoints_with_textgrad
             result = {
-                "optimal_cooling_setpoints": result_raw["best_setpoints"],
-                "applied_setpoint": result_raw["best_setpoints"][0],
-                "reason": result_raw["initial_llm_result"].get("reason", "Optimized by TextGrad"),
-                "log_path": result_raw["initial_llm_result"].get("log_path", ""),
-                "improved_prompt": result_raw.get("improved_prompt", "")
+                "optimal_cooling_setpoints": result_raw["optimal_cooling_setpoints"],
+                "applied_setpoint":           result_raw["applied_setpoint"],
+                "reason":                     result_raw.get("reason", "Optimized by TextGrad"),
+                "log_path":                   result_raw.get("log_path", ""),
+                "improved_prompt":            result_raw.get("improved_prompt", "")
             }
         else:
             print("[ReasoningServer] ✨ Using single-shot LLM generation...")
             result = generator.generate_response_from_prompt(prompt, ts_know, pdf_sum)
 
-        # 📢 콘솔 출력
+        # 📢 Debug output
         print("\n[ReasoningServer] 🔄 Cooling Control Decision (Multi-step)")
         print(f"> Setpoints (t0~t3): {result['optimal_cooling_setpoints']}")
         print(f"> Reason: {result['reason']}\n")
 
-        # ✅ 최종 응답 (simulator로 전송)
+        # ✅ Send response (to simulator_socket)
         response = {
             "optimal_cooling_setpoints": result["optimal_cooling_setpoints"],
-            "applied_setpoint": result["applied_setpoint"],
-            "reason": result["reason"]
+            "applied_setpoint":           result["applied_setpoint"],
+            "reason":                     result["reason"]
         }
 
     except Exception as e:
@@ -87,6 +90,7 @@ def handle_request(conn):
         response = {"error": str(e)}
 
     conn.sendall(json.dumps(response).encode())
+
 
 # Main server loop
 with socket.socket() as s:

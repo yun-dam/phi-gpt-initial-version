@@ -8,7 +8,6 @@ import numpy as np
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
-from feedback_simulator import run_feedback_simulation
 import itertools
 import random
 
@@ -139,80 +138,158 @@ class phiGPTGenerator:
         prompt_text: str,
         ts_knowledge=None,
         pdf_summary=None,
-        log_path="./logs/phi_gpt_log_test.csv",
-        zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
-        max_iters=5
+        log_path: str = "./logs/phi_gpt_log_test.csv",
+        zone_name: str = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
+        max_iters: int = 5,
+        debug_mode: str = "single_iter"
     ):
-        def evaluate(setpoints):
-            feedback_df = run_feedback_simulation(setpoints, log_path, zone_name)
-            energy = feedback_df["Energy_J"].sum() if "Energy_J" in feedback_df else float("inf")
-            comfort = (feedback_df["T_in"] - self.target_temp).abs().sum() if "T_in" in feedback_df else float("inf")
-            return energy + comfort, feedback_df
+        import textgrad as tg
+        import pandas as pd
+        import os
+        from feedback_simulator import run_feedback_simulation as run_sim
+        from textgrad.engine.openai import StanfordChatAI
 
-        def generate_candidates(base, exploration_n=5):
-            allowed = [22.0, 23.0, 24.0]
-            neighbors = []
+        if debug_mode == "quick":
+            result = self.generate_response_from_prompt(prompt_text, ts_knowledge, pdf_summary)
+            initial_setpoints = result.get("optimal_cooling_setpoints", [23.0] * 4)
+            return {
+                "optimal_cooling_setpoints": initial_setpoints,
+                "applied_setpoint": initial_setpoints[0],
+                "reason": "Quick debug mode - no optimization performed",
+                "log_path": log_path,
+                "improved_prompt": prompt_text
+            }
+        elif debug_mode == "single_iter":
+            max_iters = 1
 
-            # depth-1: single-site perturb
-            for i in range(4):
-                for delta in [-1, 1]:
-                    val = base[i] + delta
-                    if val in allowed:
-                        new = base[:]
-                        new[i] = val
-                        neighbors.append(new)
-
-            # # depth-2: pair-site perturb
-            # for i, j in itertools.combinations(range(4), 2):
-            #     for d1 in [-1, 1]:
-            #         for d2 in [-1, 1]:
-            #             vi, vj = base[i] + d1, base[j] + d2
-            #             if vi in allowed and vj in allowed:
-            #                 new = base[:]
-            #                 new[i] = vi
-            #                 new[j] = vj
-            #                 neighbors.append(new)
-
-            # random full candidates
-            rand_set = random.sample(list(itertools.product(allowed, repeat=4)), exploration_n)
-            neighbors.extend([list(r) for r in rand_set])
-
-            # deduplicate
-            return [list(t) for t in {tuple(x) for x in neighbors}]
-
-        print("🧠 Initial generation from LLM...")
         result = self.generate_response_from_prompt(prompt_text, ts_knowledge, pdf_summary)
-        best_setpoints = result["optimal_cooling_setpoints"]
-        best_score, best_feedback = evaluate(best_setpoints)
+        initial_setpoints = result.get("optimal_cooling_setpoints", [23.0] * 4)
+        if not initial_setpoints or len(initial_setpoints) < 4:
+            initial_setpoints = [23.0] * 4
 
-        print(f"🔍 Initial score: {best_score:.2f} | setpoints: {best_setpoints}")
+        engine = StanfordChatAI(
+            model_string="o3-mini",
+            system_prompt="You are a helpful HVAC optimization assistant.",
+            api_key_env="AI_API_KEY",
+            api_base_url="https://aiapi-prod.stanford.edu/v1"
+        )
 
-        for iteration in range(1, max_iters + 1):
-            print(f"\n🔁 Iteration {iteration}")
-            improved = False
-            for candidate in generate_candidates(best_setpoints):
-                score, _ = evaluate(candidate)
-                print(f"  Candidate {candidate} → Score: {score:.2f}")
-                if score < best_score:
-                    best_setpoints = candidate
-                    best_score = score
-                    improved = True
-                    print(f"  ✅ New best found!")
+        initial_value = ", ".join(str(v) for v in initial_setpoints)
+        setpoints_var = tg.Variable(initial_value, requires_grad=True, role_description="cooling setpoints")
 
-            if not improved:
-                print("  ❌ No improvement found. Early stopping.")
-                break
+        # ✅ 수정된 simulation_loss 함수 정의
+        def simulation_loss(setpoints, step_idx=None):
+            try:
+                val = setpoints.value
+                vals = [float(v.strip()) for v in val.split(",")]
+            except:
+                vals = [23.0] * 4
 
-        feedback_str = best_feedback.to_string(index=False)
-        improved_prompt = prompt_text + "\n\n---\n\n## Feedback from simulation:\n" + feedback_str
+            allowed = [22.0, 23.0, 24.0]
+            vals = [min(allowed, key=lambda x: abs(x - v)) for v in vals]
+            vals = (vals + [23.0]*4)[:4]
+
+            # ✅ 로그 출력
+            if step_idx is not None:
+                print(f"[TextGrad] 🧪 Running EnergyPlus simulation at iteration {step_idx}")
+
+            df = run_sim(vals, log_path, zone_name)
+            energy = df["Energy_J"].sum() if "Energy_J" in df else float("inf")
+            comfort = (df["T_in"] - self.target_temp).abs().sum() if "T_in" in df else float("inf")
+
+            score = (energy / 1_000_000) + 2.0 * comfort
+            feedback_str = (
+                f"Simulation results:\n{df.to_string(index=False)}\n\n"
+                f"Energy: {energy:.2f} J, Comfort: {comfort:.2f}, Score: {score:.2f}"
+            )
+            return tg.Variable(feedback_str, role_description="simulation feedback"), score, df
+
+
+        eval_instruction = tg.Variable(
+            """You are an HVAC optimization expert. Given the simulation feedback for a set of cooling setpoints,
+    analyze the energy consumption and comfort metrics. Based on this analysis, suggest specific improvements
+    to the setpoints to minimize both energy use and comfort violations.
+
+    Valid setpoint values are ONLY 22.0, 23.0, and 24.0 degrees Celsius.
+
+    Provide your suggestions as a comma-separated list of 4 numbers representing the optimal setpoints for 
+    30, 60, 90, and 120 minutes ahead. For example: "22.0, 23.0, 24.0, 23.0"
+    """,
+            requires_grad=False,
+            role_description="evaluation instruction"
+        )
+
+        loss_fn = tg.TextLoss(eval_instruction, engine=engine)
+        optimizer = tg.optimizer.TextualGradientDescent(parameters=[setpoints_var], engine=engine)
+
+        best_setpoints = initial_setpoints
+        feedback_var, best_score, best_df = simulation_loss(setpoints_var)
+
+        os.makedirs("./logs", exist_ok=True)
+        log_file_path = "./logs/llm_response_log.txt"
+
+        # ✅ 최적화 루프
+        for i in range(max_iters):
+            # 🔁 기본 시뮬레이션 및 피드백
+            feedback_var, score, _ = simulation_loss(setpoints_var, step_idx=i + 1)
+            loss = loss_fn(feedback_var)
+            loss.backward(engine=engine)
+            optimizer.step()
+
+            # 📄 로그 저장
+            with open(log_file_path, "a", encoding="utf-8") as f:
+                f.write(f"\n==== Iteration {i+1} ====\n")
+                f.write(f"Feedback:\n{feedback_var.value}\n")
+                f.write(f"Updated Setpoints: {setpoints_var.value}\n")
+
+            # 🔁 최적 점수 확인 및 업데이트
+            val = setpoints_var.value
+            vals = [float(v.strip()) for v in val.split(",")]
+            vals = [min([22.0, 23.0, 24.0], key=lambda x: abs(x - v)) for v in vals]
+            vals = (vals + [23.0]*4)[:4]
+
+            # 🔁 업데이트 후 성능 평가 시뮬레이션
+            _, new_score, new_df = simulation_loss(
+                tg.Variable(", ".join(map(str, vals))),
+                step_idx=f"{i + 1} (post-update)"
+            )
+
+            if new_score < best_score:
+                best_setpoints = vals
+                best_score = new_score
+                best_df = new_df
+                setpoints_var.set_value(", ".join(map(str, best_setpoints)))
+
+        prompt_with_feedback = prompt_text + "\n\n## Simulation Feedback:\n" + best_df.to_string(index=False)
+        reason_prompt = f"""
+    Based on the original context and simulation results:
+
+    {prompt_with_feedback}
+
+    Explain in 1-2 sentences why the setpoints {best_setpoints} are optimal.
+    """
+
+        reason_response = self._call_chat_api(reason_prompt)
+
+        if isinstance(reason_response, dict):
+            reason = reason_response.get("content", "Optimized by TextGrad")
+        else:
+            reason = reason_response.strip()
 
         return {
             "optimal_cooling_setpoints": best_setpoints,
             "applied_setpoint": best_setpoints[0],
-            "reason": result["initial_llm_result"].get("reason", "Optimized by TextGrad"),
-            "log_path": result["initial_llm_result"].get("log_path", ""),
-            "improved_prompt": improved_prompt
+            "reason": reason,
+            "log_path": log_path,
+            "improved_prompt": prompt_with_feedback,
+            "initial_score": None,
+            "final_score": best_score,
+            "improvement": None
         }
+
+
+
+
 
 class phiGPTRetriever:
     def __init__(
