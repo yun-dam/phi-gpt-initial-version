@@ -6,7 +6,7 @@ from phigpt import phiGPTGenerator
 
 # 1) Initialize the retriever
 retriever = phiGPTRetriever(
-    ts_db_path_simulation=r".\data\timeseries\multiindex_energyplus_data",
+    ts_db_path_simulation=r".\data\timeseries\ep_simulation",
     ts_db_path_measurement=r".\data\timeseries\multiindex_energyplus_data",
     pdf_db_path=r".\data\text",
     api_key_env="AI_API_KEY",
@@ -56,7 +56,7 @@ def handle_request(conn):
                 prompt_text=prompt,
                 ts_knowledge=ts_know,
                 pdf_summary=pdf_sum,
-                log_path="./logs/phi_gpt_log_test.csv",
+                log_path=None,
                 zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
                 max_iters=1
             )

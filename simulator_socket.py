@@ -89,9 +89,31 @@ class phiGPTSimulator(EnergyPlusPlugin):
             return 0
 
         # Skip control if buffer is not yet filled
+
         if len(self.state_buffer) < 12:
-            self.api.runtime.issue_warning(state, f"[phiGPT] Buffering... ({len(self.state_buffer)}/12)")
-            return 0
+            # ✅ Apply fixed setpoint temporarily
+            new_setpoint_c = self.fixed_setpoint_value
+            reason = "Warm-up phase (fixed control)"
+            self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
+            self.api.runtime.issue_warning(state, f"[phiGPT] Warm-up {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
+
+            # Log warm-up control event
+            month = self.api.exchange.month(state)
+            day = self.api.exchange.day_of_month(state)
+            with open(self.log_path, mode="a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    month,
+                    day,
+                    hour,
+                    minute,
+                    round(T_out, 2),
+                    round(T_in, 2),
+                    round(new_setpoint_c, 2),
+                    reason.replace("\n", " ")[:500]
+                ])
+            return 0  # Early return → LLM 제어는 skip
+
 
         # Fixed setpoint control (for debugging or baseline)
         if self.use_fixed_setpoint:

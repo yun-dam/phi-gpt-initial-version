@@ -19,7 +19,7 @@ def update_setpoints_by_time(idf_path, idd_path, log_csv_path, setpoint_list, ou
     if len(setpoint_list) != 4:
         raise ValueError("setpoint_list must contain exactly 4 values.")
 
-    df_log = pd.read_csv(log_csv_path, encoding='cp949')
+    df_log = pd.read_csv(log_csv_path)
     df_log["datetime"] = pd.to_datetime(
         df_log["hour"].astype(str).str.zfill(2) + ":" + df_log["minute"].astype(str).str.zfill(2),
         format="%H:%M"
@@ -73,8 +73,23 @@ def run_energyplus_simulation(idf_path, idd_path, epw_path, output_dir):
     idf.run(output_directory=output_dir)
     return True
 
+def find_latest_phi_gpt_log(log_dir: str) -> str:
+    """
+    Finds the most recent phi_gpt_log_*.csv file in the given log directory.
+    """
+    log_files = [
+        f for f in os.listdir(log_dir)
+        if f.startswith("phi_gpt_log_") and f.endswith(".csv")
+    ]
+    if not log_files:
+        raise FileNotFoundError("No phi_gpt_log_*.csv file found in log directory.")
+
+    latest_file = max(log_files, key=lambda f: os.path.getmtime(os.path.join(log_dir, f)))
+    return os.path.join(log_dir, latest_file)
+
+
 def extract_future_results(log_csv_path, sim_csv_path, zone_name):
-    df_log = pd.read_csv(log_csv_path, encoding='cp949')
+    df_log = pd.read_csv(log_csv_path)
     df_log["datetime"] = pd.to_datetime(
         df_log["hour"].astype(str).str.zfill(2) + ":" + df_log["minute"].astype(str).str.zfill(2),
         format="%H:%M"
@@ -107,10 +122,14 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
     df_filtered = df_filtered[result_cols].rename(columns=col_map)
     return df_filtered
 
-def run_feedback_simulation(setpoints, log_path, zone_name):
+def run_feedback_simulation(setpoints, log_path=None, zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"):
     """
     Main callable function: runs simulation with given setpoints and returns extracted metrics.
+    If log_path is None, the latest phi_gpt_log_*.csv file will be used.
     """
+    if log_path is None:
+        log_path = find_latest_phi_gpt_log("./logs")
+
     updated_idf_path = update_setpoints_by_time(
         idf_path=idf_in_path,
         idd_path=idd_file_path,
@@ -132,10 +151,9 @@ def run_feedback_simulation(setpoints, log_path, zone_name):
     sim_csv = os.path.join(output_directory, "gates_feedback_updated_out.csv")
     return extract_future_results(log_path, sim_csv, zone_name)
 
-# Optional test block
-if __name__ == "__main__":
-    test_setpoints = [22.0, 23.0, 23.0, 22.0]
-    zone = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"
-    df = run_feedback_simulation(test_setpoints, "./logs/phi_gpt_log_test.csv", zone)
-    print("\n🔍 Feedback Simulation Result:")
-    print(df.to_string(index=False))
+
+# if __name__ == "__main__":
+#     test_setpoints = [22.0, 23.0, 23.0, 22.0]
+#     df = run_feedback_simulation(test_setpoints)
+#     print("\n🔍 Feedback Simulation Result:")
+#     print(df.to_string(index=False))
