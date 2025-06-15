@@ -3,6 +3,8 @@ import json
 import traceback
 from phigpt import phiGPTRetriever
 from phigpt import phiGPTGenerator
+import os
+from datetime import datetime
 
 # 1) Initialize the retriever
 retriever = phiGPTRetriever(
@@ -17,6 +19,7 @@ retriever = phiGPTRetriever(
 
 # 2) Initialize the generator
 generator = phiGPTGenerator(
+    retriever=retriever,
     api_key_env="AI_API_KEY",
     api_base_url="https://aiapi-prod.stanford.edu/v1",
     model_name="o3-mini"
@@ -58,15 +61,47 @@ def handle_request(conn):
                 pdf_summary=pdf_sum,
                 log_path=None,
                 zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
-                max_iters=1
+                max_iters=5,
+                current_states=state_buffer
             )
-            # ← Modified mapping to use the keys returned by optimize_setpoints_with_textgrad
+
+            raw_reason = result_raw.get("reason", "")
+            print(f"[DEBUG] Raw reason from result_raw: {repr(raw_reason)}")
+            print(result_raw)
+
+            # 🪵 Save JSONL log
+            os.makedirs("./logs/reasoning_jsonl", exist_ok=True)
+            jsonl_path = f"./logs/reasoning_jsonl/result_{datetime.now().strftime('%Y%m%d')}.jsonl"
+
+            try:
+                parsed_reason = json.loads(raw_reason) if isinstance(raw_reason, str) else raw_reason
+                reason_text = parsed_reason.get("reason", parsed_reason)
+            except Exception:
+                reason_text = raw_reason
+
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "state_buffer": state_buffer,
+                "optimal_cooling_setpoints": result_raw.get("optimal_cooling_setpoints"),
+                "applied_setpoint": result_raw.get("applied_setpoint"),
+                "reason": reason_text,
+                "log_path": result_raw.get("log_path"),
+                "improved_prompt": result_raw.get("improved_prompt"),
+                "initial_score": float(result_raw.get("initial_score", -1)),
+                "final_score": float(result_raw.get("final_score", -1)),
+                "improvement": float(result_raw.get("improvement", 0.0))
+            }
+
+            with open(jsonl_path, "a", encoding="utf-8") as f:
+                json.dump(log_entry, f)
+                f.write("\n")
+
             result = {
                 "optimal_cooling_setpoints": result_raw["optimal_cooling_setpoints"],
-                "applied_setpoint":           result_raw["applied_setpoint"],
-                "reason":                     result_raw.get("reason", "Optimized by TextGrad"),
-                "log_path":                   result_raw.get("log_path", ""),
-                "improved_prompt":            result_raw.get("improved_prompt", "")
+                "applied_setpoint": result_raw["applied_setpoint"],
+                "reason": reason_text,
+                "log_path": result_raw.get("log_path", ""),
+                "improved_prompt": result_raw.get("improved_prompt", "")
             }
         else:
             print("[ReasoningServer] ✨ Using single-shot LLM generation...")
@@ -80,8 +115,8 @@ def handle_request(conn):
         # ✅ Send response (to simulator_socket)
         response = {
             "optimal_cooling_setpoints": result["optimal_cooling_setpoints"],
-            "applied_setpoint":           result["applied_setpoint"],
-            "reason":                     result["reason"]
+            "applied_setpoint": result["applied_setpoint"],
+            "reason": result["reason"]
         }
 
     except Exception as e:

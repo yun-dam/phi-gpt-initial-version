@@ -10,6 +10,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import itertools
 import random
+import csv
 
 # LangChain components
 from langchain.vectorstores.faiss import FAISS as FAISSBase
@@ -25,10 +26,12 @@ load_dotenv()
 class phiGPTGenerator:
     def __init__(
         self,
+        retriever=None, 
         api_key_env: str = "AI_API_KEY",
         api_base_url: str = "https://aiapi-prod.stanford.edu/v1",
         model_name: str = "o3-mini"
     ):
+        self.retriever = retriever
         self.api_key = os.getenv(api_key_env)
         if not self.api_key:
             raise ValueError(f"Missing API key in env var '{api_key_env}'")
@@ -141,9 +144,10 @@ class phiGPTGenerator:
             log_path=None,
             zone_name: str = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
             max_iters: int = 5,
-            debug_mode: str = "single_iter",
+            debug_mode: str = "full",
             current_states=None
         ):
+
         import textgrad as tg
         import pandas as pd
         import os
@@ -158,10 +162,11 @@ class phiGPTGenerator:
             return {
                 "optimal_cooling_setpoints": initial_setpoints,
                 "applied_setpoint": initial_setpoints[0],
-                "reason": "Quick debug mode - no optimization performed",
-                "log_path": log_path,
+                "reason": result.get("reason", "No reason provided"),
+                "log_path": result.get("log_path", None),
                 "improved_prompt": prompt_text
             }
+
         elif debug_mode == "single_iter":
             max_iters = 1
 
@@ -248,7 +253,8 @@ class phiGPTGenerator:
 
         os.makedirs("./logs", exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file_path = f"./logs/llm_response_log_{timestamp}.jsonl"
+        log_file_path = f"./logs/llm_response_log_{timestamp}.csv"
+        is_new_file = not os.path.exists(log_file_path)
 
         for i in range(max_iters):
             state_context = ""
@@ -256,16 +262,25 @@ class phiGPTGenerator:
                 state_context = self.retriever.generate_query_from_state(current_states)
 
             instruction_var = tg.Variable(
-                f"You are an HVAC optimization expert.\n"
-                f"Current zone state:\n{state_context}\n\n"
-                "Given the simulation feedback for a set of cooling setpoints, analyze the energy consumption and comfort metrics.\n"
-                "Based on this analysis, suggest specific improvements to the setpoints to minimize both energy use and comfort violations.\n\n"
-                "Valid setpoint values are ONLY 22.0, 23.0, and 24.0 degrees Celsius.\n"
-                "Provide your suggestions as a comma-separated list of 4 numbers representing the optimal setpoints for \n"
-                "30, 60, 90, and 120 minutes ahead. For example: \"22.0, 23.0, 24.0, 23.0\"",
-                requires_grad=False,
-                role_description="loss function specification for feedback simulator"
+            f"You are an HVAC optimization expert.\n"
+            f"You are controlling a **single thermal zone**, and your task is to suggest a sequence of 4 cooling setpoints (°C),\n"
+            f"each corresponding to a 30-minute interval, for the upcoming 2-hour control horizon.\n\n"
+            f"These 4 setpoints represent the control sequence for **one zone only**, not multiple zones.\n"
+            f"You must consider the effects of **thermal lag**, meaning the indoor temperature changes gradually in response to setpoint adjustments.\n"
+            f"Your objective is to minimize both future energy use and thermal discomfort over time.\n\n"
+            f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 23.0, or 24.0.\n"
+            f"For example:\n"
+            f"22.0, 23.0, 23.0, 24.0\n\n"
+            f"⚠️ Formatting Rules:\n"
+            f"- Do NOT include brackets, quotes, units (°C), or JSON/XML\n"
+            f"- Do NOT mention zone numbers or names\n"
+            f"- Do NOT include any explanation or surrounding text\n"
+            f"- Just output 4 numbers separated by commas",
+            requires_grad=False,
+            role_description="instruction for generating updated setpoints"
             )
+
+
 
             loss_fn = tg.TextLoss(instruction_var, engine=engine)
             feedback_var, score, _ = simulation_loss(setpoints_var, step_idx=i + 1)
@@ -273,13 +288,20 @@ class phiGPTGenerator:
             loss.backward(engine=engine)
             optimizer.step()
 
-            log_entry = {
-                "iteration": i + 1,
-                "feedback": feedback_var.value,
-                "updated_setpoints": setpoints_var.value
+            log_row = {
+            "sim_time": current_states[-1]["time"] if current_states and "time" in current_states[-1] else "unknown",
+            "iteration": i + 1,
+            "updated_setpoints": setpoints_var.value,
+            "score": score,
+            "feedback": feedback_var.value.replace("\n", " ")[:500]  # 줄바꿈 제거 및 길이 제한
             }
-            with open(log_file_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+            with open(log_file_path, "a", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=log_row.keys())
+                if is_new_file:
+                    writer.writeheader()
+                    is_new_file = False
+                writer.writerow(log_row)
 
             val = setpoints_var.value
             vals = []
@@ -316,20 +338,31 @@ class phiGPTGenerator:
                 setpoints_var.set_value(", ".join(map(str, best_setpoints)))
 
         prompt_with_feedback = prompt_text + "\n\n## Simulation Feedback:\n" + best_df.to_string(index=False)
-        reason_prompt = f"""
-        Based on the original context and simulation results:
+        reason_prompt = (
+            f"You are an HVAC expert evaluating the final cooling setpoints.\n\n"
+            f"Context:\n{prompt_text}\n\n"
+            f"Simulation Feedback Summary:\n{best_df.to_string(index=False)}\n\n"
+            f"Setpoints Proposed: {best_setpoints}\n\n"
+            f"Please explain concisely in 1–2 sentences why these setpoints were selected, "
+            f"considering energy savings and indoor comfort trends."
+        )
 
-        {prompt_with_feedback}
 
-        Explain in 1-2 sentences why the setpoints {best_setpoints} are optimal.
-        """
+        reason_response = self._call_chat_api(reason_prompt).strip()
 
-        reason_response = self._call_chat_api(reason_prompt)
+        try:
+            maybe_json = json.loads(reason_response)
+            if isinstance(maybe_json, dict) and "reason" in maybe_json:
+                reason = maybe_json["reason"]
+                print(f"[phiGPT] ✅ Extracted 'reason' from JSON:\n{repr(reason)}")
+            else:
+                reason = reason_response
+                print(f"[phiGPT] ✅ Fallback to raw string reason:\n{repr(reason)}")
+        except json.JSONDecodeError:
+            reason = reason_response
+            print(f"[phiGPT] ✅ Received plain string reason:\n{repr(reason)}")
 
-        if isinstance(reason_response, dict):
-            reason = reason_response.get("content", "Optimized by TextGrad")
-        else:
-            reason = reason_response.strip()
+
 
         return {
             "optimal_cooling_setpoints": best_setpoints,
@@ -350,7 +383,7 @@ class phiGPTRetriever:
     def __init__(
         self,
         ts_db_path_simulation,
-        ts_db_path_measurement,  # 그대로 받아오되, 사용은 안 함
+        ts_db_path_measurement,
         pdf_db_path,
         api_key_env: str = "AI_API_KEY",
         api_base_url: str = "https://aiapi-prod.stanford.edu/v1",

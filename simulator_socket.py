@@ -16,10 +16,15 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.T_in_handle = None
         self.prev_min = -1
         self.zone = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"
-        self.state_buffer = deque(maxlen=12)  # Store 12 timesteps (10-minute interval → 2 hours)
+        self.state_buffer = deque(maxlen=12)  # Store 12 samples (30-minute interval → 6 hours)
 
         self.use_fixed_setpoint = False
         self.fixed_setpoint_value = 25
+
+        self.cooling_energy_handle = None 
+
+        self.last_buffer_update = (-1, -1)  # (hour, minute) to track last buffer entry
+        self.first_day = None  # (month, day) of first simulation day
 
         # Logging setup
         now = datetime.datetime.now()
@@ -39,7 +44,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
 
         with open(self.log_path, mode="w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["month", "day", "hour", "minute", "T_out", "T_in", "T_set", "reason"])
+            writer.writerow(["month", "day", "hour", "minute", "T_out", "T_in", "T_set", "Cooling_Energy_J", "reason"])
 
         self.socket_src = os.path.join(base_dir, "socket.csv")
         self.socket_meter_src = os.path.join(base_dir, "socketMeter.csv")
@@ -49,6 +54,11 @@ class phiGPTSimulator(EnergyPlusPlugin):
             return 0
 
         if self.need_handles:
+
+            self.cooling_energy_handle = self.api.exchange.get_variable_handle(
+            state, "Zone Air Terminal Sensible Cooling Energy", "ADU VAV HW RHT 13"
+            )
+
             self.cooling_handle = self.api.exchange.get_actuator_handle(
                 state, "Zone Temperature Control", "Cooling Setpoint", self.zone
             )
@@ -59,7 +69,8 @@ class phiGPTSimulator(EnergyPlusPlugin):
                 state, "Zone Mean Air Temperature", self.zone
             )
 
-            if self.cooling_handle == -1 or self.T_out_handle == -1 or self.T_in_handle == -1:
+            if (self.cooling_handle == -1 or self.T_out_handle == -1 or 
+                self.T_in_handle == -1 or self.cooling_energy_handle == -1):
                 self.api.runtime.issue_severe(state, "[phiGPT] ❌ Failed to get one or more handles.")
                 return 0
 
@@ -70,65 +81,87 @@ class phiGPTSimulator(EnergyPlusPlugin):
                 self.api.runtime.issue_warning(state, "[phiGPT] 🧠 LLM Reasoning Mode Activated.")
             self.need_handles = False
 
+        sim_time = self.api.exchange.current_sim_time(state)
+        if sim_time == self.prev_min:
+            return 0
+        self.prev_min = sim_time
+
+        month = self.api.exchange.month(state)
+        day = self.api.exchange.day_of_month(state)
+
+        if self.first_day is None:
+            self.first_day = (month, day)
+
         hour = self.api.exchange.hour(state)
         minute = self.api.exchange.minutes(state)
 
-        if minute == self.prev_min:
-            return 0
-        self.prev_min = minute
 
-        # Update state buffer every 10 minutes
-        T_out = self.api.exchange.get_variable_value(state, self.T_out_handle)
-        T_in = self.api.exchange.get_variable_value(state, self.T_in_handle)
-        T_set = self.api.exchange.get_actuator_value(state, self.cooling_handle)
+        # Append to buffer only every 30 minutes
+        if (hour, minute) != self.last_buffer_update and minute in (0, 30):
+            T_out = self.api.exchange.get_variable_value(state, self.T_out_handle)
+            T_in = self.api.exchange.get_variable_value(state, self.T_in_handle)
+            T_set = self.api.exchange.get_actuator_value(state, self.cooling_handle)
+            self.state_buffer.append((T_out, T_in, T_set))
+            self.last_buffer_update = (hour, minute)
 
-        self.state_buffer.append((T_out, T_in, T_set))
-
-        # Only perform control every 30 minutes (minute == 0 or 30)
         if minute not in (0, 30):
             return 0
 
-        # Skip control if buffer is not yet filled
-
-        if len(self.state_buffer) < 12:
-            # ✅ Apply fixed setpoint temporarily
+        if (month, day) == self.first_day and hour < 6:
             new_setpoint_c = self.fixed_setpoint_value
-            reason = "Warm-up phase (fixed control)"
-            self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
-            self.api.runtime.issue_warning(state, f"[phiGPT] Warm-up {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
+            reason = "Warm-up phase (before 6AM on first simulation day)"
 
-            # Log warm-up control event
+            self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
+            self.api.runtime.issue_warning(state, f"[phiGPT] Warm-up (before 6AM) {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
+
             month = self.api.exchange.month(state)
             day = self.api.exchange.day_of_month(state)
+            cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
             with open(self.log_path, mode="a", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    month,
-                    day,
-                    hour,
-                    minute,
-                    round(T_out, 2),
-                    round(T_in, 2),
-                    round(new_setpoint_c, 2),
-                    reason.replace("\n", " ")[:500]
+                    month, day, hour, minute,
+                    round(T_out, 2), round(T_in, 2), round(new_setpoint_c, 2),
+                    round(cooling_energy, 2),
+                    reason
                 ])
-            return 0  # Early return → LLM 제어는 skip
 
+            return 0
 
-        # Fixed setpoint control (for debugging or baseline)
-        if self.use_fixed_setpoint:
+        if len(self.state_buffer) < 12:
             new_setpoint_c = self.fixed_setpoint_value
-            reason = "Fixed setpoint mode (no LLM reasoning)"
-        else:
-            # Call external reasoning server with state history
-            response = self.query_reasoning_server(list(self.state_buffer))
+            reason = "Warm-up phase (insufficient state_buffer)"
+            self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
+            self.api.runtime.issue_warning(state, f"[phiGPT] Warm-up {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
 
+            month = self.api.exchange.month(state)
+            day = self.api.exchange.day_of_month(state)
+            cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
+            with open(self.log_path, mode="a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    month, day, hour, minute,
+                    round(T_out, 2), round(T_in, 2), round(new_setpoint_c, 2),
+                    round(cooling_energy, 2),
+                    reason
+                ])
+
+
+        if self.use_fixed_setpoint:
+            # Use 25°C only on first day before 6AM
+            if (month, day) == self.first_day and hour < 6:
+                new_setpoint_c = 25.0
+                reason = "Warm-up fixed setpoint (25°C before 6AM on first day)"
+            else:
+                new_setpoint_c = 23.0  # Use 23°C fixed value afterward
+                reason = "Fixed setpoint mode (23°C after warm-up)"
+
+        else:
+            response = self.query_reasoning_server(list(self.state_buffer))
             if response:
-                # ✅ New format: multi-step setpoints
                 if "optimal_cooling_setpoints" in response:
                     new_setpoint_c = response["optimal_cooling_setpoints"][0]
                     reason = response.get("reason", "N/A")
-                # ✅ Old format: single setpoint
                 elif "optimal_cooling_setpoint" in response:
                     new_setpoint_c = response["optimal_cooling_setpoint"]
                     reason = response.get("reason", "N/A")
@@ -137,28 +170,21 @@ class phiGPTSimulator(EnergyPlusPlugin):
                     return 0
             else:
                 self.api.runtime.issue_warning(state, "[phiGPT] ⚠️ No valid response from reasoning server.")
-                reason = "No valid response"
                 return 0
 
-        # Apply the new cooling setpoint
         self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
         self.api.runtime.issue_warning(state, f"[phiGPT] {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
 
-        # Log the control event
         month = self.api.exchange.month(state)
         day = self.api.exchange.day_of_month(state)
-
+        cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
         with open(self.log_path, mode="a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
-                month,
-                day,
-                hour,
-                minute,
-                round(T_out, 2),
-                round(T_in, 2),
-                round(new_setpoint_c, 2),
-                reason.replace("\n", " ")[:500]
+                month, day, hour, minute,
+                round(T_out, 2), round(T_in, 2), round(new_setpoint_c, 2),
+                round(cooling_energy, 2),  
+                reason
             ])
 
         return 0
@@ -179,7 +205,6 @@ class phiGPTSimulator(EnergyPlusPlugin):
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-        # Notify reasoning server to shut down
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect(("127.0.0.1", 55555))
@@ -190,7 +215,6 @@ class phiGPTSimulator(EnergyPlusPlugin):
         except Exception as e:
             print(f"[phiGPTSimulator] ⚠️ Failed to send shutdown signal: {e}")
 
-        # Save EnergyPlus socket outputs (used for post-analysis)
         if self.use_fixed_setpoint:
             fixed_str = str(round(self.fixed_setpoint_value, 1)).replace('.', '')
             socket_dst = os.path.join(self.log_dir, f"socket_fixed{fixed_str}_{timestamp}.csv")

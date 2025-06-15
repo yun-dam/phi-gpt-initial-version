@@ -70,7 +70,7 @@ def run_energyplus_simulation(idf_path, idd_path, epw_path, output_dir):
     IDF.setiddname(idd_path)
     idf = IDF(idf_path, epw_path)
     os.makedirs(output_dir, exist_ok=True)
-    idf.run(output_directory=output_dir)
+    idf.run(output_directory=output_dir, readvars=True, output_prefix="gates_feedback_updated_")
     return True
 
 def find_latest_phi_gpt_log(log_dir: str) -> str:
@@ -89,23 +89,43 @@ def find_latest_phi_gpt_log(log_dir: str) -> str:
 
 
 def extract_future_results(log_csv_path, sim_csv_path, zone_name):
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    # Load log file
     df_log = pd.read_csv(log_csv_path)
-    df_log["datetime"] = pd.to_datetime(
-        df_log["hour"].astype(str).str.zfill(2) + ":" + df_log["minute"].astype(str).str.zfill(2),
-        format="%H:%M"
-    )
-    last_time = df_log["datetime"].iloc[-1]
+    last_hour = int(df_log["hour"].iloc[-1])
+    last_min = int(df_log["minute"].iloc[-1])
 
-    base_date = datetime.strptime("08/08", "%m/%d")
-    full_last_time = base_date.replace(hour=last_time.hour, minute=last_time.minute)
-    future_times = [full_last_time + timedelta(minutes=delta) for delta in [30, 60, 90, 120]]
-    formatted_times = [f" {dt.strftime('%m/%d')}  {dt.strftime('%H:%M:%S')}" for dt in future_times]
-
+    # Load simulation CSV
     df_sim = pd.read_csv(sim_csv_path)
     df_sim.columns = [col.strip('"') for col in df_sim.columns]
-    df_filtered = df_sim[df_sim["Date/Time"].isin(formatted_times)].copy()
-    df_filtered["datetime"] = formatted_times[:len(df_filtered)]
 
+    # Fix 24:00:00 to 00:00:00 next day
+    def fix_24_hour(dt_str):
+        dt_str = dt_str.strip()
+        if "24:00:00" in dt_str:
+            date_part = dt_str.split()[0]
+            new_dt = datetime.strptime(date_part + " 00:00:00", "%m/%d %H:%M:%S") + timedelta(days=1)
+        else:
+            new_dt = datetime.strptime(dt_str, "%m/%d %H:%M:%S")
+        return new_dt
+
+    # Parse datetime
+    df_sim["datetime"] = df_sim["Date/Time"].apply(fix_24_hour)
+
+    # Find the simulation row closest to last (hour:min)
+    target_min = last_hour * 60 + last_min
+    df_sim["delta_min"] = df_sim["datetime"].dt.hour * 60 + df_sim["datetime"].dt.minute
+    df_sim["delta_to_last"] = abs(df_sim["delta_min"] - target_min)
+
+    anchor_idx = df_sim["delta_to_last"].idxmin()
+    target_indices = [anchor_idx + i for i in [1, 2, 3, 4]]  # 30, 60, 90, 120 mins later
+
+    # Extract available rows
+    df_future = df_sim.iloc[[i for i in target_indices if i < len(df_sim)]].copy()
+
+    # Extract key columns
     temp_col = f"{zone_name}:Zone Air Temperature [C](TimeStep)"
     setp_col = f"{zone_name}:Zone Thermostat Cooling Setpoint Temperature [C](TimeStep)"
     terminal_col = "ADU VAV HW RHT 13:Zone Air Terminal Sensible Cooling Energy [J](TimeStep)"
@@ -119,8 +139,9 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
             col_map[col] = label
             result_cols.append(col)
 
-    df_filtered = df_filtered[result_cols].rename(columns=col_map)
-    return df_filtered
+    df_future = df_future[result_cols].rename(columns=col_map)
+    return df_future
+
 
 def run_feedback_simulation(setpoints, log_path=None, zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"):
     """
