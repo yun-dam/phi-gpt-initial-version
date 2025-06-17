@@ -266,7 +266,6 @@ class phiGPTGenerator:
             f"You are controlling a **single thermal zone**, and your task is to suggest a sequence of 4 cooling setpoints (°C),\n"
             f"each corresponding to a 30-minute interval, for the upcoming 2-hour control horizon.\n\n"
             f"These 4 setpoints represent the control sequence for **one zone only**, not multiple zones.\n"
-            f"You must consider the effects of **thermal lag**, meaning the indoor temperature changes gradually in response to setpoint adjustments.\n"
             f"Your objective is to minimize both future energy use and thermal discomfort over time.\n\n"
             f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 23.0, or 24.0.\n"
             f"For example:\n"
@@ -549,7 +548,12 @@ class phiGPTRetriever:
             "- Minimize total cooling energy consumption\n"
             f"- Maintain indoor temperature close to {self.target_temp:.1f}°C\n"
             "- Adapt to current building and environmental conditions using historical system behavior and expert strategies\n"
-            "- Take into account the **thermal lag** effect — indoor temperature responds gradually to changes in setpoints.\n\n"
+            "---\n\n"
+            "## Building and Zone Context\n"
+            "The building is an 'L'-shaped facility located on a university campus in Stanford, California, where the climate is Mediterranean with warm, dry summers and mild, wet winters.\n"
+            "It consists of a basement and five above-ground floors, totaling approximately 13,006 m².\n"
+            "Originally constructed in 1996 and renovated in 2021, it accommodates around 550 faculty, staff, and students across offices, classrooms, and meeting rooms.\n"
+            "The target thermal zone is on the first floor's South Perimeter, primarily used as a meeting room and office space.\n\n"
             "---\n\n"
             "## Current System States (Last Few Hours)\n"
             f"{current_states_table}\n\n"
@@ -566,7 +570,6 @@ class phiGPTRetriever:
             "Please choose **4 cooling setpoints**, one for each of the next 4 time steps (t₀, t₁, t₂, t₃).\n"
             "- Each time step corresponds to 30 minutes (2-hour control horizon).\n"
             "- Choose each setpoint from the options: **[22°C, 23°C, 24°C]**.\n"
-            "- Because of thermal lag, your choices should anticipate future temperature behavior rather than reacting only to the present.\n\n"
             "Output your result in **valid JSON format** exactly as shown below.\n\n"
             "---\n\n"
             "## Output Format\n"
@@ -581,5 +584,4 @@ class phiGPTRetriever:
     def generate_optimized_setpoint(self, current_states):
         prompt, ts_know, pdf_retrieved = self.build_cooling_prompt(current_states)
         result = self.generator.generate_response_from_prompt(prompt, ts_know, pdf_retrieved)
-        return result["applied_setpoint"]  # ✅ t₀만 실제 제어에 사용
-
+        return result["applied_setpoint"] 

@@ -18,8 +18,8 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.zone = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"
         self.state_buffer = deque(maxlen=12)  # Store 12 samples (30-minute interval → 6 hours)
 
-        self.use_fixed_setpoint = False
-        self.fixed_setpoint_value = 25
+        self.use_fixed_setpoint = True
+        self.fixed_setpoint_value = 23
 
         self.cooling_energy_handle = None 
 
