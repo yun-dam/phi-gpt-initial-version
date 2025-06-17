@@ -14,7 +14,8 @@ retriever = phiGPTRetriever(
     api_key_env="AI_API_KEY",
     api_base_url="https://aiapi-prod.stanford.edu/v1",
     model_name="o3-mini",
-    horizon_hours=3
+    horizon_hours=3,
+    target_zone="THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE"
 )
 
 # 2) Initialize the generator
