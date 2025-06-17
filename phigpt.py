@@ -387,7 +387,8 @@ class phiGPTRetriever:
         api_key_env: str = "AI_API_KEY",
         api_base_url: str = "https://aiapi-prod.stanford.edu/v1",
         model_name: str = "o3-mini",
-        horizon_hours: int = 3
+        horizon_hours: int = 3, 
+        target_zone=None
     ):
         self.api_key = os.getenv(api_key_env)
         if not self.api_key:
@@ -400,6 +401,7 @@ class phiGPTRetriever:
         }
 
         self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        self.target_zone = target_zone
 
         # ✅ Simulation vectorstore만 사용
         self.vectorstore_simulation = FAISSBase.load_local(
@@ -491,18 +493,22 @@ class phiGPTRetriever:
         docs = self.pdf_retriever.get_relevant_documents(query)
         return "\n\n".join(d.page_content for d in docs)
 
-    def retrieve_time_series_knowledge(self, current_states, top_k=5):
+    def retrieve_time_series_knowledge(self, current_states, top_k=5, target_zone=None):
+        import ast  # ensure ast is imported if not already
+
         current_vector = np.round(np.mean(np.array(current_states), axis=0), 4).tolist()
+        
+        # ✔️ 필터 없이 바로 top_k만 가져오기
         sim_docs = self.vectorstore_simulation.similarity_search(str(current_vector), k=top_k)
-        parsed_sim = [ast.literal_eval(lst) for lst in "\n\n".join(d.page_content for d in sim_docs).strip().split('\n\n')]
+
+        parsed_sim = [ast.literal_eval(doc.page_content) for doc in sim_docs]
         sim_text = self.format_state_series_table(parsed_sim, label="Simulation", is_nested=True)
 
-        # 🔒 측정 기반 검색은 현재 비활성화
         # meas_docs = self.vectorstore_measurement.similarity_search(str(current_vector), k=top_k)
         # parsed_meas = [ast.literal_eval(lst) for lst in "\n\n".join(d.page_content for d in meas_docs).strip().split('\n\n')]
         # meas_text = self.format_state_series_table(parsed_meas, label="Measurement", is_nested=True)
 
-        return {"simulation": sim_text, "measurement": ""}  # 빈 문자열로 처리
+        return {"simulation": sim_text, "measurement": ""}
 
     def format_state_series_table(self, series_list, label="State", is_nested=False):
         def make_table_block(series, block_label):
@@ -530,15 +536,37 @@ class phiGPTRetriever:
             return make_table_block(series_list, label)
 
     def build_cooling_prompt(self, current_states):
+        import ast
+
+        def get_floor_and_location(zone_name: str) -> str:
+            story_map = {
+                "STORY 1": "basement floor 1",
+                "STORY 2": "first floor",
+                "STORY 3": "second floor",
+                "STORY 4": "third floor",
+                "STORY 5": "fourth floor",
+                "STORY 6": "fifth floor"
+            }
+
+            for story_key, floor_text in story_map.items():
+                if story_key in zone_name:
+                    try:
+                        # Extract the location description after the story keyword
+                        location_part = zone_name.split(f"{story_key} ")[1].replace("SPACE", "").strip().title()
+                        return f"on the {floor_text}'s {location_part}"
+                    except IndexError:
+                        continue
+            return "in the target thermal zone"
+
+        # Retrieve historical patterns
         ts_knowledge = self.retrieve_time_series_knowledge(current_states, top_k=5)
         current_states_table = self.format_state_series_table(current_states, label="Current State", is_nested=False)
         retrieved_text = self.get_relevant_pdf_text(current_states)
 
+        # 🔄 Zone description string
+        zone_description = get_floor_and_location(self.target_zone if hasattr(self, 'target_zone') else "")
 
-        # 🔒 측정 기반 패턴은 현재 출력 안 함
-        # "### Measurement-based Patterns:\n"
-        # f"{ts_knowledge['measurement']}\n\n"
-
+        # Construct prompt
         prompt = (
             f"# COOLING Setpoint Optimizer\n\n"
             f"You are an intelligent agent tasked with optimizing the COOLING setpoints for a building based on time-series HVAC data.\n\n"
@@ -553,7 +581,7 @@ class phiGPTRetriever:
             "The building is an 'L'-shaped facility located on a university campus in Stanford, California, where the climate is Mediterranean with warm, dry summers and mild, wet winters.\n"
             "It consists of a basement and five above-ground floors, totaling approximately 13,006 m².\n"
             "Originally constructed in 1996 and renovated in 2021, it accommodates around 550 faculty, staff, and students across offices, classrooms, and meeting rooms.\n"
-            "The target thermal zone is on the first floor's South Perimeter, primarily used as a meeting room and office space.\n\n"
+            f"The target thermal zone is {zone_description}, primarily used as a meeting room and office space.\n\n"
             "---\n\n"
             "## Current System States (Last Few Hours)\n"
             f"{current_states_table}\n\n"
@@ -580,6 +608,7 @@ class phiGPTRetriever:
         )
 
         return prompt, ts_knowledge, retrieved_text
+
 
     def generate_optimized_setpoint(self, current_states):
         prompt, ts_know, pdf_retrieved = self.build_cooling_prompt(current_states)
