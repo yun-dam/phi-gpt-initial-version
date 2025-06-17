@@ -144,7 +144,7 @@ class phiGPTGenerator:
             log_path=None,
             zone_name: str = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
             max_iters: int = 5,
-            debug_mode: str = "full",
+            debug_mode: str = "quick",
             current_states=None
         ):
 

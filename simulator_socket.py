@@ -7,6 +7,7 @@ import csv
 from pyenergyplus.plugin import EnergyPlusPlugin
 from collections import deque
 
+
 class phiGPTSimulator(EnergyPlusPlugin):
     def __init__(self):
         super().__init__()
@@ -15,18 +16,17 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.T_out_handle = None
         self.T_in_handle = None
         self.prev_min = -1
-        self.zone = "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"
-        self.state_buffer = deque(maxlen=12)  # Store 12 samples (30-minute interval → 6 hours)
+        self.zone = None  # Zone will be set after querying the reasoning server
+        self.state_buffer = deque(maxlen=12)
 
         self.use_fixed_setpoint = True
         self.fixed_setpoint_value = 23
+        self.use_deadband_mode = False
 
-        self.cooling_energy_handle = None 
+        self.cooling_energy_handle = None
+        self.last_buffer_update = (-1, -1)
+        self.first_day = None
 
-        self.last_buffer_update = (-1, -1)  # (hour, minute) to track last buffer entry
-        self.first_day = None  # (month, day) of first simulation day
-
-        # Logging setup
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
 
@@ -34,12 +34,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.log_dir = os.path.join(base_dir, "logs")
         os.makedirs(self.log_dir, exist_ok=True)
 
-        if self.use_fixed_setpoint:
-            fixed_str = str(round(self.fixed_setpoint_value, 1)).replace('.', '')
-            filename = f"phi_gpt_log_fixed{fixed_str}_{timestamp}.csv"
-        else:
-            filename = f"phi_gpt_log_{timestamp}.csv"
-
+        filename = f"phi_gpt_log_fixed{str(round(self.fixed_setpoint_value, 1)).replace('.', '')}_{timestamp}.csv" if self.use_fixed_setpoint else f"phi_gpt_log_{timestamp}.csv"
         self.log_path = os.path.join(self.log_dir, filename)
 
         with open(self.log_path, mode="w", newline="") as f:
@@ -49,16 +44,32 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.socket_src = os.path.join(base_dir, "socket.csv")
         self.socket_meter_src = os.path.join(base_dir, "socketMeter.csv")
 
+        # ✅ Initial query to get zone name from reasoning server
+        self.initialize_zone_name_from_server()
+
+    def initialize_zone_name_from_server(self):
+        """Initial call to get zone name before handles are initialized."""
+        dummy_buffer = [[0.0, 0.0, 0.0]] * 12  # minimal valid buffer
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect(("127.0.0.1", 55555))
+                message = json.dumps({"state_buffer": dummy_buffer})
+                s.sendall(message.encode('utf-8'))
+                response = s.recv(8192)
+                result = json.loads(response.decode('utf-8'))
+                self.zone = result.get("zone_name")
+                print(f"[phiGPT] ✅ Received zone name from server: {self.zone}")
+        except Exception as e:
+            print(f"[phiGPT] ❌ Failed to retrieve zone name: {e}")
+
     def on_begin_zone_timestep_before_set_current_weather(self, state) -> int:
         if not self.api.exchange.api_data_fully_ready(state):
             return 0
 
         if self.need_handles:
-
             self.cooling_energy_handle = self.api.exchange.get_variable_handle(
-            state, "Zone Air Terminal Sensible Cooling Energy", "ADU VAV HW RHT 13"
+                state, "Zone Air Terminal Sensible Cooling Energy", "ADU VAV HW RHT 13"
             )
-
             self.cooling_handle = self.api.exchange.get_actuator_handle(
                 state, "Zone Temperature Control", "Cooling Setpoint", self.zone
             )
@@ -77,6 +88,8 @@ class phiGPTSimulator(EnergyPlusPlugin):
             self.api.runtime.issue_warning(state, "[phiGPT] ✅ Handles acquired.")
             if self.use_fixed_setpoint:
                 self.api.runtime.issue_warning(state, f"[phiGPT] 🔵 Fixed Setpoint Mode Activated: {self.fixed_setpoint_value:.2f}°C")
+            elif self.use_deadband_mode:
+                self.api.runtime.issue_warning(state, "[phiGPT] 🟢 Deadband Mode Activated.")
             else:
                 self.api.runtime.issue_warning(state, "[phiGPT] 🧠 LLM Reasoning Mode Activated.")
             self.need_handles = False
@@ -88,15 +101,12 @@ class phiGPTSimulator(EnergyPlusPlugin):
 
         month = self.api.exchange.month(state)
         day = self.api.exchange.day_of_month(state)
+        hour = self.api.exchange.hour(state)
+        minute = self.api.exchange.minutes(state)
 
         if self.first_day is None:
             self.first_day = (month, day)
 
-        hour = self.api.exchange.hour(state)
-        minute = self.api.exchange.minutes(state)
-
-
-        # Append to buffer only every 30 minutes
         if (hour, minute) != self.last_buffer_update and minute in (0, 30):
             T_out = self.api.exchange.get_variable_value(state, self.T_out_handle)
             T_in = self.api.exchange.get_variable_value(state, self.T_in_handle)
@@ -107,55 +117,33 @@ class phiGPTSimulator(EnergyPlusPlugin):
         if minute not in (0, 30):
             return 0
 
+        T_out = self.api.exchange.get_variable_value(state, self.T_out_handle)
+        T_in = self.api.exchange.get_variable_value(state, self.T_in_handle)
+
         if (month, day) == self.first_day and hour < 6:
             new_setpoint_c = self.fixed_setpoint_value
             reason = "Warm-up phase (before 6AM on first simulation day)"
-
-            self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
-            self.api.runtime.issue_warning(state, f"[phiGPT] Warm-up (before 6AM) {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
-
-            month = self.api.exchange.month(state)
-            day = self.api.exchange.day_of_month(state)
-            cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
-            with open(self.log_path, mode="a", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    month, day, hour, minute,
-                    round(T_out, 2), round(T_in, 2), round(new_setpoint_c, 2),
-                    round(cooling_energy, 2),
-                    reason
-                ])
-
-            return 0
-
-        if len(self.state_buffer) < 12:
+        elif len(self.state_buffer) < 12:
             new_setpoint_c = self.fixed_setpoint_value
             reason = "Warm-up phase (insufficient state_buffer)"
-            self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
-            self.api.runtime.issue_warning(state, f"[phiGPT] Warm-up {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
-
-            month = self.api.exchange.month(state)
-            day = self.api.exchange.day_of_month(state)
-            cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
-            with open(self.log_path, mode="a", newline="") as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    month, day, hour, minute,
-                    round(T_out, 2), round(T_in, 2), round(new_setpoint_c, 2),
-                    round(cooling_energy, 2),
-                    reason
-                ])
-
-
-        if self.use_fixed_setpoint:
-            # Use 25°C only on first day before 6AM
+        elif self.use_fixed_setpoint:
             if (month, day) == self.first_day and hour < 6:
                 new_setpoint_c = 25.0
                 reason = "Warm-up fixed setpoint (25°C before 6AM on first day)"
             else:
-                new_setpoint_c = 23.0  # Use 23°C fixed value afterward
+                new_setpoint_c = 23.0
                 reason = "Fixed setpoint mode (23°C after warm-up)"
-
+        elif self.use_deadband_mode:
+            T_set = self.api.exchange.get_actuator_value(state, self.cooling_handle)
+            if T_in <= 22.5:
+                new_setpoint_c = 24.0
+                reason = "Deadband control: T_in ≤ 22.5°C → Raised setpoint to 24.0°C"
+            elif T_in >= 23.5:
+                new_setpoint_c = 22.0
+                reason = "Deadband control: T_in ≥ 23.5°C → Lowered setpoint to 22.0°C"
+            else:
+                new_setpoint_c = T_set
+                reason = "Deadband control: Within deadband (no change)"
         else:
             response = self.query_reasoning_server(list(self.state_buffer))
             if response:
@@ -175,18 +163,14 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.api.exchange.set_actuator_value(state, self.cooling_handle, new_setpoint_c)
         self.api.runtime.issue_warning(state, f"[phiGPT] {hour:02}:{minute:02} → Setpoint = {new_setpoint_c:.2f}°C")
 
-        month = self.api.exchange.month(state)
-        day = self.api.exchange.day_of_month(state)
         cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
         with open(self.log_path, mode="a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
                 month, day, hour, minute,
                 round(T_out, 2), round(T_in, 2), round(new_setpoint_c, 2),
-                round(cooling_energy, 2),  
-                reason
+                round(cooling_energy, 2), reason
             ])
-
         return 0
 
     def query_reasoning_server(self, state_buffer):
@@ -236,3 +220,28 @@ class phiGPTSimulator(EnergyPlusPlugin):
             self.api.runtime.issue_warning(state, "[phiGPT] ⚠️ socketMeter.csv not found.")
 
         return 0
+
+# Zone cadidates:
+
+# THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE
+# THERMAL ZONE: STORY 2 NORTH UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 2 WEST PERIMETER SPACE
+# THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE
+# THERMAL ZONE: STORY 3 EAST LOWER PERIMETER SPACE
+# THERMAL ZONE: STORY 3 EAST UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 3 NORTH UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 3 SOUTH PERIMETER SPACE
+# THERMAL ZONE: STORY 3 WEST PERIMETER SPACE
+# THERMAL ZONE: STORY 4 EAST LOWER PERIMETER SPACE
+# THERMAL ZONE: STORY 4 NORTH UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 4 SOUTH PERIMETER SPACE
+# THERMAL ZONE: STORY 4 WEST PERIMETER SPACE
+# THERMAL ZONE: STORY 5 EAST UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 5 NORTH LOWER PERIMETER SPACE
+# THERMAL ZONE: STORY 5 NORTH UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 5 SOUTH PERIMETER SPACE
+# THERMAL ZONE: STORY 6 EAST UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 6 NORTH LOWER PERIMETER SPACE
+# THERMAL ZONE: STORY 6 NORTH UPPER PERIMETER SPACE
+# THERMAL ZONE: STORY 6 SOUTH PERIMETER SPACE
+# THERMAL ZONE: STORY 6 WEST PERIMETER SPACE

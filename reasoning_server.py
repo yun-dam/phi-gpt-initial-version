@@ -6,6 +6,11 @@ from phigpt import phiGPTGenerator
 import os
 from datetime import datetime
 
+zone_name = "THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE"
+
+if not zone_name:
+    raise ValueError("Zone name must be defined.")
+
 # 1) Initialize the retriever
 retriever = phiGPTRetriever(
     ts_db_path_simulation=r".\data\timeseries\ep_simulation",
@@ -15,7 +20,7 @@ retriever = phiGPTRetriever(
     api_base_url="https://aiapi-prod.stanford.edu/v1",
     model_name="o3-mini",
     horizon_hours=3,
-    target_zone="THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE"
+    target_zone=zone_name
 )
 
 # 2) Initialize the generator
@@ -23,7 +28,8 @@ generator = phiGPTGenerator(
     retriever=retriever,
     api_key_env="AI_API_KEY",
     api_base_url="https://aiapi-prod.stanford.edu/v1",
-    model_name="o3-mini"
+    model_name="o3-mini",
+    debug_mode = "quick",  
 )
 
 # Use TextGrad?
@@ -61,7 +67,7 @@ def handle_request(conn):
                 ts_knowledge=ts_know,
                 pdf_summary=pdf_sum,
                 log_path=None,
-                zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE",
+                zone_name=zone_name,
                 max_iters=5,
                 current_states=state_buffer
             )
@@ -83,6 +89,7 @@ def handle_request(conn):
             log_entry = {
                 "timestamp": datetime.now().isoformat(),
                 "state_buffer": state_buffer,
+                "zone_name": zone_name,
                 "optimal_cooling_setpoints": result_raw.get("optimal_cooling_setpoints"),
                 "applied_setpoint": result_raw.get("applied_setpoint"),
                 "reason": reason_text,
