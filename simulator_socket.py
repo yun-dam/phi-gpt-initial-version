@@ -44,9 +44,6 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.socket_src = os.path.join(base_dir, "socket.csv")
         self.socket_meter_src = os.path.join(base_dir, "socketMeter.csv")
 
-        # ✅ Initial query to get zone name from reasoning server
-        self.initialize_zone_name_from_server()
-
     def initialize_zone_name_from_server(self):
         """Initial call to get zone name before handles are initialized."""
         dummy_buffer = [[0.0, 0.0, 0.0]] * 12  # minimal valid buffer
@@ -65,6 +62,24 @@ class phiGPTSimulator(EnergyPlusPlugin):
     def on_begin_zone_timestep_before_set_current_weather(self, state) -> int:
         if not self.api.exchange.api_data_fully_ready(state):
             return 0
+        
+        if self.zone is None:
+            dummy_buffer = [[0.0, 0.0, 0.0]] * 12
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect(("127.0.0.1", 55555))
+                    message = json.dumps({"state_buffer": dummy_buffer})
+                    s.sendall(message.encode('utf-8'))
+                    response = s.recv(8192)
+                    result = json.loads(response.decode('utf-8'))
+                    self.zone = result.get("zone_name")
+                    if not self.zone:
+                        self.api.runtime.issue_severe(state, "[phiGPT] ❌ Failed to receive zone_name from server.")
+                        return 1
+                    self.api.runtime.issue_warning(state, f"[phiGPT] ✅ Zone set to: {self.zone}")
+            except Exception as e:
+                self.api.runtime.issue_severe(state, f"[phiGPT] ❌ Socket error while getting zone_name: {e}")
+                return 1
 
         if self.need_handles:
             self.cooling_energy_handle = self.api.exchange.get_variable_handle(

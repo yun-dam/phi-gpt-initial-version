@@ -28,8 +28,7 @@ generator = phiGPTGenerator(
     retriever=retriever,
     api_key_env="AI_API_KEY",
     api_base_url="https://aiapi-prod.stanford.edu/v1",
-    model_name="o3-mini",
-    debug_mode = "quick",  
+    model_name="o3-mini"
 )
 
 # Use TextGrad?
