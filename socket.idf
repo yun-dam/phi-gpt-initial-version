@@ -4,6 +4,29 @@
 !-NOTE: All comments with '!-' are ignored by the IDFEditor and are generated automatically.
 !-      Use '!' comments if they need to be retained when using the IDFEditor.
 
+Output:Variable,*,Zone Thermal Comfort Fanger Model PMV,Timestep;
+
+Schedule:Compact,
+    AirVelocitySchedule,     !- Name
+    Any Number,              !- Schedule Type Limits Name
+    Through: 12/31,          !- Field 1
+    For: AllDays,            !- Field 2
+    Until: 24:00, .15;       !- Field 4
+
+Schedule:Compact,
+    WorkEffSchedule,         !- Name
+    Any Number,              !- Schedule Type Limits Name
+    Through: 12/31,          !- Field 1
+    For: AllDays,            !- Field 2
+    Until: 24:00, 0;         !- Field 4
+
+Schedule:Compact,
+    CloSchedule,             !- Name
+    Any Number,              !- Schedule Type Limits Name
+    Through: 12/31,          !- Field 1
+    For: AllDays,            !- Field 2
+    Until: 24:00, .5;        !- Field 4
+
 EnergyManagementSystem:Sensor,
     ZoneMeanAirTemp_2_East_Lower_Perimeter,  !- Name
     THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE,  !- Output:Variable or Output:Meter Index Key Name
@@ -441,7 +464,7 @@ RunPeriod,
     5,                       !- Begin Day of Month
     2022,                    !- Begin Year
     9,                       !- End Month
-    9,                       !- End Day of Month
+    6,                       !- End Day of Month
     2022,                    !- End Year
     Monday,                  !- Day of Week for Start Day
     No,                      !- Use Weather File Holidays and Special Days
@@ -72300,12 +72323,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72331,12 +72354,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72362,12 +72385,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72393,12 +72416,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72424,12 +72447,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72455,12 +72478,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72486,12 +72509,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72517,12 +72540,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72548,12 +72571,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72579,12 +72602,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72610,12 +72633,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72641,12 +72664,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72672,12 +72695,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72703,12 +72726,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72734,12 +72757,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72765,12 +72788,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72796,12 +72819,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72827,12 +72850,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72858,12 +72881,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72889,12 +72912,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72920,12 +72943,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72951,12 +72974,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -72982,12 +73005,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73013,12 +73036,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73044,12 +73067,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73075,12 +73098,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73106,12 +73129,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73137,12 +73160,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73168,12 +73191,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73199,12 +73222,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73230,12 +73253,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73261,12 +73284,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73292,12 +73315,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73323,12 +73346,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73354,12 +73377,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73385,12 +73408,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73416,12 +73439,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73447,12 +73470,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73478,12 +73501,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73509,12 +73532,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73540,12 +73563,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73571,12 +73594,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73602,12 +73625,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73633,12 +73656,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73664,12 +73687,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73695,12 +73718,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73726,12 +73749,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type
@@ -73757,12 +73780,12 @@ People,
     ,                        !- Enable ASHRAE 55 Comfort Warnings
     ,                        !- Mean Radiant Temperature Calculation Type
     ,                        !- Surface Name/Angle Factor List Name
-    ,                        !- Work Efficiency Schedule Name
+    WorkEffSchedule,         !- Work Efficiency Schedule Name
     ,                        !- Clothing Insulation Calculation Method
     ,                        !- Clothing Insulation Calculation Method Schedule Name
-    ,                        !- Clothing Insulation Schedule Name
-    ,                        !- Air Velocity Schedule Name
-    ,                        !- Thermal Comfort Model 1 Type
+    CloSchedule,             !- Clothing Insulation Schedule Name
+    AirVelocitySchedule,     !- Air Velocity Schedule Name
+    Fanger,                  !- Thermal Comfort Model 1 Type
     ,                        !- Thermal Comfort Model 2 Type
     ,                        !- Thermal Comfort Model 3 Type
     ,                        !- Thermal Comfort Model 4 Type

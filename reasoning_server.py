@@ -6,7 +6,7 @@ from phigpt import phiGPTGenerator
 import os
 from datetime import datetime
 
-zone_name = "THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE"
+zone_name = "THERMAL ZONE: STORY 4 EAST LOWER PERIMETER SPACE"
 
 if not zone_name:
     raise ValueError("Zone name must be defined.")
@@ -51,13 +51,14 @@ def handle_request(conn):
 
     # Extract state buffer
     state_buffer = message.get("state_buffer")
+    current_time = message.get("current_time", None) 
     if state_buffer is None:
         conn.sendall(json.dumps({"error": "No state_buffer provided."}).encode())
         return
 
     try:
         # 🧠 Build prompt
-        prompt, ts_know, pdf_sum = retriever.build_cooling_prompt(state_buffer)
+        prompt, ts_know, pdf_sum = retriever.build_cooling_prompt(state_buffer, current_time=current_time)
 
         if use_textgrad:
             print("[ReasoningServer] 🚀 Using TextGrad optimization...")

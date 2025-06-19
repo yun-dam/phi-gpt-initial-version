@@ -210,7 +210,7 @@ class phiGPTGenerator:
             except:
                 vals = [self.target_temp] * 4
 
-            allowed = [22.0, 23.0, 24.0]
+            allowed = [22.0, 22.5, 23.0, 23.5, 24.0]
             vals = [min(allowed, key=lambda x: abs(x - v)) for v in vals]
             vals = (vals + [self.target_temp] * 4)[:4]
 
@@ -267,9 +267,9 @@ class phiGPTGenerator:
             f"each corresponding to a 30-minute interval, for the upcoming 2-hour control horizon.\n\n"
             f"These 4 setpoints represent the control sequence for **one zone only**, not multiple zones.\n"
             f"Your objective is to minimize both future energy use and thermal discomfort over time.\n\n"
-            f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 23.0, or 24.0.\n"
+            f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 22.5, 23.0, 23.5, or 24.0.\n"
             f"For example:\n"
-            f"22.0, 23.0, 23.0, 24.0\n\n"
+            f"22.0, 22.5, 23.0, 24.0\n\n"
             f"⚠️ Formatting Rules:\n"
             f"- Do NOT include brackets, quotes, units (°C), or JSON/XML\n"
             f"- Do NOT mention zone numbers or names\n"
@@ -535,7 +535,7 @@ class phiGPTRetriever:
         else:
             return make_table_block(series_list, label)
 
-    def build_cooling_prompt(self, current_states):
+    def build_cooling_prompt(self, current_states, current_time=None):
         import ast
 
         def get_floor_and_location(zone_name: str) -> str:
@@ -551,7 +551,6 @@ class phiGPTRetriever:
             for story_key, floor_text in story_map.items():
                 if story_key in zone_name:
                     try:
-                        # Extract the location description after the story keyword
                         location_part = zone_name.split(f"{story_key} ")[1].replace("SPACE", "").strip().title()
                         return f"on the {floor_text}'s {location_part}"
                     except IndexError:
@@ -563,10 +562,19 @@ class phiGPTRetriever:
         current_states_table = self.format_state_series_table(current_states, label="Current State", is_nested=False)
         retrieved_text = self.get_relevant_pdf_text(current_states)
 
-        # 🔄 Zone description string
         zone_description = get_floor_and_location(self.target_zone if hasattr(self, 'target_zone') else "")
 
-        # Construct prompt
+        # ⏰ Time description block (optional)
+        if current_time:
+            time_info = (
+                f"### Current Time:\n"
+                f"- Month: {current_time['month']}, Day: {current_time['day']}, "
+                f"Hour: {current_time['hour']}, Minute: {current_time['minute']}\n\n"
+            )
+        else:
+            time_info = ""
+
+        # Prompt construction
         prompt = (
             f"# COOLING Setpoint Optimizer\n\n"
             f"You are an intelligent agent tasked with optimizing the COOLING setpoints for a building based on time-series HVAC data.\n\n"
@@ -574,7 +582,7 @@ class phiGPTRetriever:
             "## Objective\n"
             f"Determine the optimal cooling setpoints for the next 4 time steps (t₀ to t₃), each representing a 30-minute interval (totaling 2 hours), that:\n"
             "- Minimize total cooling energy consumption\n"
-            f"- Maintain indoor temperature close to {self.target_temp:.1f}°C\n"
+            f"- Maintain indoor temperature between {self.target_temp - 0.5:.1f}°C and {self.target_temp + 0.5:.1f}°C\n"
             "- Adapt to current building and environmental conditions using historical system behavior and expert strategies\n"
             "---\n\n"
             "## Building and Zone Context\n"
@@ -583,6 +591,7 @@ class phiGPTRetriever:
             "Originally constructed in 1996 and renovated in 2021, it accommodates around 550 faculty, staff, and students across offices, classrooms, and meeting rooms.\n"
             f"The target thermal zone is {zone_description}, primarily used as a meeting room and office space.\n\n"
             "---\n\n"
+            f"{time_info}"
             "## Current System States (Last Few Hours)\n"
             f"{current_states_table}\n\n"
             "---\n\n"
@@ -597,17 +606,18 @@ class phiGPTRetriever:
             "## Response Instructions\n"
             "Please choose **4 cooling setpoints**, one for each of the next 4 time steps (t₀, t₁, t₂, t₃).\n"
             "- Each time step corresponds to 30 minutes (2-hour control horizon).\n"
-            "- Choose each setpoint from the options: **[22°C, 23°C, 24°C]**.\n"
+            "- Choose each setpoint from the options: **[22°C, 22.5°C, 23°C, 23.5°C, 24°C]**.\n"
             "Output your result in **valid JSON format** exactly as shown below.\n\n"
             "---\n\n"
             "## Output Format\n"
             "{\n"
-            "  \"optimal_cooling_setpoints\": [23, 22, 22, 23],\n"
+            "  \"optimal_cooling_setpoints\": [23.5, 22.5, 22.5, 23],\n"
             "  \"reason\": \"Started with strong cooling due to rising indoor temps, then relaxed as trend stabilizes\"\n"
             "}"
         )
 
         return prompt, ts_knowledge, retrieved_text
+
 
 
     def generate_optimized_setpoint(self, current_states):
