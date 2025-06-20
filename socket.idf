@@ -464,7 +464,7 @@ RunPeriod,
     5,                       !- Begin Day of Month
     2022,                    !- Begin Year
     9,                       !- End Month
-    6,                       !- End Day of Month
+    9,                       !- End Day of Month
     2022,                    !- End Year
     Monday,                  !- Day of Week for Start Day
     No,                      !- Use Weather File Holidays and Special Days

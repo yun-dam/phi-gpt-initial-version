@@ -6,7 +6,7 @@ from phigpt import phiGPTGenerator
 import os
 from datetime import datetime
 
-zone_name = "THERMAL ZONE: STORY 4 EAST LOWER PERIMETER SPACE"
+zone_name = "THERMAL ZONE: STORY 6 SOUTH PERIMETER SPACE"
 
 if not zone_name:
     raise ValueError("Zone name must be defined.")
