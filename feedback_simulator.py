@@ -11,7 +11,7 @@ import shutil
 idd_file_path    = "./ep-model/feedback_simulator/Energy+.idd"
 idf_in_path      = "./ep-model/feedback_simulator/gates_feedback_base.idf"
 idf_out_path     = "./ep-model/feedback_simulator/gates_feedback_updated.idf"
-epw_path         = "./ep-model/feedback_simulator/USA_MT_Charlie.Stanford.720996_TMYx.2007-2021.epw"
+epw_path         = "./USA_CA_Palo.Alto.AP.724937_TMYx.2009-2023.epw"
 output_directory = "./ep-model/feedback_simulator/output"
 
 def update_setpoints_by_time(idf_path, idd_path, log_csv_path, setpoint_list, output_path=None):
