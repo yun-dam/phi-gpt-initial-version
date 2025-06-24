@@ -83,7 +83,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.T_in_handle = None
         self.pmv_handle = None
         self.prev_min = -1
-        self.zone = "THERMAL ZONE: STORY 6 NORTH UPPER PERIMETER SPACE"
+        self.zone = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE"
         self.state_buffer = deque(maxlen=12)
 
         self.use_fixed_setpoint = False
