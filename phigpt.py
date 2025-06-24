@@ -210,7 +210,8 @@ class phiGPTGenerator:
             except:
                 vals = [self.target_temp] * 4
 
-            allowed = [22.0, 22.5, 23.0, 23.5, 24.0]
+            # allowed = [22.0, 22.5, 23.0, 23.5, 24.0]
+            allowed = [22.0, 23.0, 24.0]
             vals = [min(allowed, key=lambda x: abs(x - v)) for v in vals]
             vals = (vals + [self.target_temp] * 4)[:4]
 
@@ -267,9 +268,10 @@ class phiGPTGenerator:
             f"each corresponding to a 30-minute interval, for the upcoming 2-hour control horizon.\n\n"
             f"These 4 setpoints represent the control sequence for **one zone only**, not multiple zones.\n"
             f"Your objective is to minimize both future energy use and thermal discomfort over time.\n\n"
-            f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 22.5, 23.0, 23.5, or 24.0.\n"
+            # f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 22.5, 23.0, 23.5, or 24.0.\n"
+            f"Return your answer as a single **comma-separated list** of 4 numeric values using only these options: 22.0, 23.0, or 24.0.\n"
             f"For example:\n"
-            f"22.0, 22.5, 23.0, 24.0\n\n"
+            f"22.0, 23.0, 23.0, 24.0\n\n"
             f"⚠️ Formatting Rules:\n"
             f"- Do NOT include brackets, quotes, units (°C), or JSON/XML\n"
             f"- Do NOT mention zone numbers or names\n"
@@ -446,11 +448,11 @@ class phiGPTRetriever:
         num_timesteps = arr.shape[0]
 
         avg_state = np.round(np.mean(arr, axis=0), 2)
-        avg_out, avg_inn, avg_setp = avg_state.tolist()
+        avg_out, avg_inn, avg_setp, avg_energy = avg_state.tolist()
         avg_delta = round(avg_inn - avg_setp, 2)
 
         curr = arr[-1]
-        curr_out, curr_inn, curr_setp = np.round(curr, 2).tolist()
+        curr_out, curr_inn, curr_setp, curr_energy = np.round(curr, 2).tolist()
         curr_delta = round(curr_inn - curr_setp, 2)
 
         target_indoor = 24.0
@@ -514,17 +516,17 @@ class phiGPTRetriever:
         def make_table_block(series, block_label):
             header = (
                 f"{block_label}\n"
-                "Hour | Outdoor Temp (°C) | Indoor Temp (°C) | Cooling Setpoint (°C) | Indoor - Setpoint | Δ Indoor | Δ Outdoor\n"
-                "-----|------------------|------------------|------------------------|-------------------|-----------|------------"
+                "Hour | Outdoor Temp (°C) | Indoor Temp (°C) | Cooling Setpoint (°C) | Energy (J) | Indoor - Setpoint | Δ Indoor | Δ Outdoor\n"
+                "-----|------------------|------------------|------------------------|------------|-------------------|-----------|------------"
             )
             rows = []
             prev_indoor = None
             prev_outdoor = None
-            for hour, (out_c, inn_c, setp_c) in enumerate(series):
+            for hour, (out_c, inn_c, setp_c, energy_j) in enumerate(series):
                 delta1 = round(inn_c - setp_c, 2)
                 delta2 = round(inn_c - prev_indoor, 2) if prev_indoor is not None else "N/A"
                 delta3 = round(out_c - prev_outdoor, 2) if prev_outdoor is not None else "N/A"
-                row = f"{hour:>4} | {round(out_c, 2):>17} | {round(inn_c, 2):>17} | {round(setp_c, 2):>24} | {delta1:>17} | {str(delta2):>9} | {str(delta3):>10}"
+                row = f"{hour:>4} | {round(out_c, 2):>17} | {round(inn_c, 2):>17} | {round(setp_c, 2):>24} | {round(energy_j, 2):>10} | {delta1:>17} | {str(delta2):>9} | {str(delta3):>10}"
                 rows.append(row)
                 prev_indoor = inn_c
                 prev_outdoor = out_c
@@ -584,6 +586,7 @@ class phiGPTRetriever:
             "- Minimize total cooling energy consumption\n"
             f"- Maintain indoor temperature between {self.target_temp - 0.5:.1f}°C and {self.target_temp + 0.5:.1f}°C\n"
             "- Adapt to current building and environmental conditions using historical system behavior and expert strategies\n"
+            "- Reduce total cooling energy use, based on recent energy consumption trends\n"
             "---\n\n"
             "## Building and Zone Context\n"
             "The building is an 'L'-shaped facility located on a university campus in Stanford, California, where the climate is Mediterranean with warm, dry summers and mild, wet winters.\n"
@@ -594,6 +597,7 @@ class phiGPTRetriever:
             f"{time_info}"
             "## Current System States (Last Few Hours)\n"
             f"{current_states_table}\n\n"
+            "Each timestep includes cooling energy use, measured in joules (J), to support more energy-efficient control decisions.\n\n"
             "---\n\n"
             "## Retrieved Historical Patterns\n"
             "### Simulation-based Patterns:\n"
@@ -606,19 +610,17 @@ class phiGPTRetriever:
             "## Response Instructions\n"
             "Please choose **4 cooling setpoints**, one for each of the next 4 time steps (t₀, t₁, t₂, t₃).\n"
             "- Each time step corresponds to 30 minutes (2-hour control horizon).\n"
-            "- Choose each setpoint from the options: **[22°C, 22.5°C, 23°C, 23.5°C, 24°C]**.\n"
+            "- Choose each setpoint from the options: **[22°C, 23°C, 24°C]**.\n"
             "Output your result in **valid JSON format** exactly as shown below.\n\n"
             "---\n\n"
             "## Output Format\n"
             "{\n"
-            "  \"optimal_cooling_setpoints\": [23.5, 22.5, 22.5, 23],\n"
+            "  \"optimal_cooling_setpoints\": [23, 22, 22, 23],\n"
             "  \"reason\": \"Started with strong cooling due to rising indoor temps, then relaxed as trend stabilizes\"\n"
             "}"
         )
 
         return prompt, ts_knowledge, retrieved_text
-
-
 
     def generate_optimized_setpoint(self, current_states):
         prompt, ts_know, pdf_retrieved = self.build_cooling_prompt(current_states)

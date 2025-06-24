@@ -4,6 +4,8 @@ import pandas as pd
 import re
 from datetime import datetime, timedelta
 from eppy.modeleditor import IDF
+import shutil
+
 
 # Path configuration
 idd_file_path    = "./ep-model/feedback_simulator/Energy+.idd"
@@ -73,10 +75,10 @@ def run_energyplus_simulation(idf_path, idd_path, epw_path, output_dir):
     idf.run(output_directory=output_dir, readvars=True, output_prefix="gates_feedback_updated_")
     return True
 
+
+import time
+
 def find_latest_phi_gpt_log(log_dir: str) -> str:
-    """
-    Finds the most recent phi_gpt_log_*.csv file in the given log directory.
-    """
     log_files = [
         f for f in os.listdir(log_dir)
         if f.startswith("phi_gpt_log_") and f.endswith(".csv")
@@ -85,12 +87,85 @@ def find_latest_phi_gpt_log(log_dir: str) -> str:
         raise FileNotFoundError("No phi_gpt_log_*.csv file found in log directory.")
 
     latest_file = max(log_files, key=lambda f: os.path.getmtime(os.path.join(log_dir, f)))
-    return os.path.join(log_dir, latest_file)
+    full_path = os.path.join(log_dir, latest_file)
+    temp_path = os.path.join(log_dir, "latest_tmp_log.csv")
+
+    # 🚨 Retry copy up to 5 times
+    for attempt in range(5):
+        try:
+            shutil.copy2(full_path, temp_path)
+            return temp_path
+        except PermissionError:
+            print(f"⚠️ PermissionError: retrying... ({attempt+1}/5)")
+            time.sleep(0.5)
+
+    raise PermissionError(f"Failed to copy log file after 5 attempts: {full_path}")
 
 
 def extract_future_results(log_csv_path, sim_csv_path, zone_name):
     import pandas as pd
     from datetime import datetime, timedelta
+
+    # 🧩 내부에서 zone_to_adu_name 정의
+    def zone_to_adu_name(zone_name):
+        mapping = {
+            "THERMAL ZONE: STORY 1 EAST CORE SPACE": 0,
+            "THERMAL ZONE: STORY 1 EAST LOWER PERIMETER SPACE": 1,
+            "THERMAL ZONE: STORY 1 EAST UPPER PERIMETER SPACE": 2,
+            "THERMAL ZONE: STORY 1 NORTH LOWER PERIMETER SPACE": 3,
+            "THERMAL ZONE: STORY 1 NORTH UPPER PERIMETER SPACE": 4,
+            "THERMAL ZONE: STORY 1 SOUTH PERIMETER SPACE": 5,
+            "THERMAL ZONE: STORY 1 WEST CORE SPACE": 6,
+            "THERMAL ZONE: STORY 1 WEST PERIMETER SPACE": 7,
+            "THERMAL ZONE: STORY 2 EAST CORE SPACE": 8,
+            "THERMAL ZONE: STORY 2 EAST LOWER PERIMETER SPACE": 9,
+            "THERMAL ZONE: STORY 2 EAST UPPER PERIMETER SPACE": 10,
+            "THERMAL ZONE: STORY 2 NORTH LOWER PERIMETER SPACE": 11,
+            "THERMAL ZONE: STORY 2 NORTH UPPER PERIMETER SPACE": 12,
+            "THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE": 13,
+            "THERMAL ZONE: STORY 2 WEST CORE SPACE": 14,
+            "THERMAL ZONE: STORY 2 WEST PERIMETER SPACE": 15,
+            "THERMAL ZONE: STORY 3 EAST CORE SPACE": 16,
+            "THERMAL ZONE: STORY 3 EAST LOWER PERIMETER SPACE": 17,
+            "THERMAL ZONE: STORY 3 EAST UPPER PERIMETER SPACE": 18,
+            "THERMAL ZONE: STORY 3 NORTH LOWER PERIMETER SPACE": 19,
+            "THERMAL ZONE: STORY 3 NORTH UPPER PERIMETER SPACE": 20,
+            "THERMAL ZONE: STORY 3 SOUTH PERIMETER SPACE": 21,
+            "THERMAL ZONE: STORY 3 WEST CORE SPACE": 22,
+            "THERMAL ZONE: STORY 3 WEST PERIMETER SPACE": 23,
+            "THERMAL ZONE: STORY 4 EAST CORE SPACE": 24,
+            "THERMAL ZONE: STORY 4 EAST LOWER PERIMETER SPACE": 25,
+            "THERMAL ZONE: STORY 4 EAST UPPER PERIMETER SPACE": 26,
+            "THERMAL ZONE: STORY 4 NORTH LOWER PERIMETER SPACE": 27,
+            "THERMAL ZONE: STORY 4 NORTH UPPER PERIMETER SPACE": 28,
+            "THERMAL ZONE: STORY 4 SOUTH PERIMETER SPACE": 29,
+            "THERMAL ZONE: STORY 4 WEST CORE SPACE": 30,
+            "THERMAL ZONE: STORY 4 WEST PERIMETER SPACE": 31,
+            "THERMAL ZONE: STORY 5 EAST CORE SPACE": 32,
+            "THERMAL ZONE: STORY 5 EAST LOWER PERIMETER SPACE": 33,
+            "THERMAL ZONE: STORY 5 EAST UPPER PERIMETER SPACE": 34,
+            "THERMAL ZONE: STORY 5 NORTH LOWER PERIMETER SPACE": 35,
+            "THERMAL ZONE: STORY 5 NORTH UPPER PERIMETER SPACE": 36,
+            "THERMAL ZONE: STORY 5 SOUTH PERIMETER SPACE": 37,
+            "THERMAL ZONE: STORY 5 WEST CORE SPACE": 38,
+            "THERMAL ZONE: STORY 5 WEST PERIMETER SPACE": 39,
+            "THERMAL ZONE: STORY 6 EAST CORE SPACE": 40,
+            "THERMAL ZONE: STORY 6 EAST LOWER PERIMETER SPACE": 41,
+            "THERMAL ZONE: STORY 6 EAST UPPER PERIMETER SPACE": 42,
+            "THERMAL ZONE: STORY 6 NORTH LOWER PERIMETER SPACE": 43,
+            "THERMAL ZONE: STORY 6 NORTH UPPER PERIMETER SPACE": 44,
+            "THERMAL ZONE: STORY 6 SOUTH PERIMETER SPACE": 45,
+            "THERMAL ZONE: STORY 6 WEST CORE SPACE": 46,
+            "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE": 47,
+        }
+        index = mapping.get(zone_name.upper())
+        if index is None:
+            raise ValueError(f"Unknown zone name: {zone_name}")
+        return "ADU VAV HW RHT" if index == 0 else f"ADU VAV HW RHT {index}"
+
+    # Set dynamic terminal column name
+    adu_name = zone_to_adu_name(zone_name)
+    terminal_col = f"{adu_name}:Zone Air Terminal Sensible Cooling Energy [J](TimeStep)"
 
     # Load log file
     df_log = pd.read_csv(log_csv_path)
@@ -101,7 +176,7 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
     df_sim = pd.read_csv(sim_csv_path)
     df_sim.columns = [col.strip('"') for col in df_sim.columns]
 
-    # Fix 24:00:00 to 00:00:00 next day
+    # Fix 24:00:00
     def fix_24_hour(dt_str):
         dt_str = dt_str.strip()
         if "24:00:00" in dt_str:
@@ -111,45 +186,66 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
             new_dt = datetime.strptime(dt_str, "%m/%d %H:%M:%S")
         return new_dt
 
-    # Parse datetime
     df_sim["datetime"] = df_sim["Date/Time"].apply(fix_24_hour)
 
-    # Find the simulation row closest to last (hour:min)
+    # Match target time
     target_min = last_hour * 60 + last_min
     df_sim["delta_min"] = df_sim["datetime"].dt.hour * 60 + df_sim["datetime"].dt.minute
     df_sim["delta_to_last"] = abs(df_sim["delta_min"] - target_min)
 
     anchor_idx = df_sim["delta_to_last"].idxmin()
-    target_indices = [anchor_idx + i for i in [1, 2, 3, 4]]  # 30, 60, 90, 120 mins later
+    target_indices = [anchor_idx + i for i in [1, 2, 3, 4]]  # +30, 60, 90, 120 mins
 
-    # Extract available rows
     df_future = df_sim.iloc[[i for i in target_indices if i < len(df_sim)]].copy()
 
-    # Extract key columns
+    # Extract columns
     temp_col = f"{zone_name}:Zone Air Temperature [C](TimeStep)"
     setp_col = f"{zone_name}:Zone Thermostat Cooling Setpoint Temperature [C](TimeStep)"
-    terminal_col = "ADU VAV HW RHT 13:Zone Air Terminal Sensible Cooling Energy [J](TimeStep)"
 
     result_cols = ["datetime"]
     col_map = {}
 
     for col in [temp_col, setp_col, terminal_col]:
         if col in df_sim.columns:
-            label = "T_in" if "Air Temperature" in col else "T_set" if "Cooling Setpoint" in col else "Energy_J"
-            col_map[col] = label
+            if "Air Temperature" in col:
+                col_map[col] = "T_in"
+            elif "Cooling Setpoint" in col:
+                col_map[col] = "T_set"
+            elif "Cooling Energy" in col:
+                col_map[col] = "Energy_J"
             result_cols.append(col)
 
     df_future = df_future[result_cols].rename(columns=col_map)
     return df_future
 
 
-def run_feedback_simulation(setpoints, log_path=None, zone_name="THERMAL ZONE: STORY 2 SOUTH PERIMETER SPACE"):
+def find_latest_phi_gpt_log_path(log_dir: str) -> str:
+    """
+    Find the most recently modified phi_gpt_log_*.csv file in the given directory or its subdirectories.
+    """
+    candidate_files = []
+
+    for root, _, files in os.walk(log_dir):
+        for f in files:
+            if f.startswith("phi_gpt_log_") and f.endswith(".csv"):
+                full_path = os.path.join(root, f)
+                candidate_files.append(full_path)
+
+    if not candidate_files:
+        raise FileNotFoundError("No phi_gpt_log_*.csv file found in or under log directory.")
+
+    latest_file = max(candidate_files, key=os.path.getmtime)
+    return latest_file
+
+
+def run_feedback_simulation(setpoints, log_path=None, zone_name=None):
     """
     Main callable function: runs simulation with given setpoints and returns extracted metrics.
     If log_path is None, the latest phi_gpt_log_*.csv file will be used.
     """
     if log_path is None:
-        log_path = find_latest_phi_gpt_log("./logs")
+        raise ValueError("log_path must be provided (phi_gpt_log_*.csv).")
+
 
     updated_idf_path = update_setpoints_by_time(
         idf_path=idf_in_path,

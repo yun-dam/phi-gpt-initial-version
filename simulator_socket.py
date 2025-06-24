@@ -83,7 +83,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.T_in_handle = None
         self.pmv_handle = None
         self.prev_min = -1
-        self.zone = "THERMAL ZONE: STORY 6 SOUTH PERIMETER SPACE"
+        self.zone = "THERMAL ZONE: STORY 6 NORTH UPPER PERIMETER SPACE"
         self.state_buffer = deque(maxlen=12)
 
         self.use_fixed_setpoint = False
@@ -180,7 +180,8 @@ class phiGPTSimulator(EnergyPlusPlugin):
 
         if (hour, minute) != self.last_buffer_update and minute in (0, 30):
             T_set = self.api.exchange.get_actuator_value(state, self.cooling_handle)
-            self.state_buffer.append((T_out, T_in, T_set))
+            cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
+            self.state_buffer.append((T_out, T_in, T_set, cooling_energy))
             self.last_buffer_update = (hour, minute)
 
         if minute not in (0, 30):
@@ -216,15 +217,19 @@ class phiGPTSimulator(EnergyPlusPlugin):
             # LLM-based mode with 1-step delay
             response = self.query_reasoning_server(list(self.state_buffer))
             if response:
-                if "optimal_cooling_setpoints" in response:
+                if "applied_setpoint" in response:
+                    self.pending_setpoint = response["applied_setpoint"]
+                    reason = response.get("reason", "Applied setpoint from reasoning server")
+                elif "optimal_cooling_setpoints" in response:
                     self.pending_setpoint = response["optimal_cooling_setpoints"][0]
-                    reason = response.get("reason", "N/A")
+                    reason = response.get("reason", "Fallback: used first of optimal_cooling_setpoints")
                 elif "optimal_cooling_setpoint" in response:
                     self.pending_setpoint = response["optimal_cooling_setpoint"]
-                    reason = response.get("reason", "N/A")
+                    reason = response.get("reason", "Fallback: used single optimal_cooling_setpoint")
                 else:
                     self.api.runtime.issue_warning(state, "[phiGPT] ⚠️ No valid setpoint key found in response.")
                     return 0
+
             else:
                 self.api.runtime.issue_warning(state, "[phiGPT] ⚠️ No valid response from reasoning server.")
                 return 0
