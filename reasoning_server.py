@@ -68,7 +68,7 @@ def handle_request(conn):
         prompt, ts_know, pdf_sum = retriever.build_cooling_prompt(state_buffer, current_time=current_time)
 
         if control_mode == "textgrad":
-            print("[ReasoningServer] 🚀 Using TextGrad optimization...")
+            print("[ReasoningServer] 🚀 Using PhiGPT...")
             result_raw = generator.optimize_setpoints_with_textgrad(
                 prompt_text=prompt,
                 ts_knowledge=ts_know,
@@ -98,20 +98,24 @@ def handle_request(conn):
             }
 
         elif control_mode == "mpc":
-            print("[ReasoningServer] ✨ Using MPC optimization (4-step grid search)...")
+            print("[ReasoningServer] ✨ Using MPC optimization...")
 
             from sim_optimize_setpoints import find_best_setpoint_by_simulation
             best_seq, best_score = find_best_setpoint_by_simulation(
-                log_path=log_dir,
+                log_path=None,
                 zone_name=zone_name,
                 w_energy=1.0,
-                w_comfort=100000.0
+                w_comfort=3.0
             )
 
             result = {
                 "optimal_cooling_setpoints": list(best_seq),
                 "applied_setpoint": best_seq[0],
-                "reason": f"Selected based on MPC optimization (score={best_score:.2f})"
+                "reason": (
+                    f"MPC optimization selected this 4-step setpoint. "
+                    f"Normalized Score: {best_score:.4f} "
+                    f"(Energy: {energy_score:.4f}, Comfort: {comfort_score:.4f})"
+                )
             }
 
         else:
