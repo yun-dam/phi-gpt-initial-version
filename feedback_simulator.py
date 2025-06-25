@@ -4,8 +4,7 @@ import pandas as pd
 import re
 from datetime import datetime, timedelta
 from eppy.modeleditor import IDF
-import shutil
-
+import time
 
 # Path configuration
 idd_file_path    = "./ep-model/feedback_simulator/Energy+.idd"
@@ -75,9 +74,6 @@ def run_energyplus_simulation(idf_path, idd_path, epw_path, output_dir):
     idf.run(output_directory=output_dir, readvars=True, output_prefix="gates_feedback_updated_")
     return True
 
-
-import time
-
 def find_latest_phi_gpt_log(log_dir: str) -> str:
     log_files = [
         f for f in os.listdir(log_dir)
@@ -90,7 +86,6 @@ def find_latest_phi_gpt_log(log_dir: str) -> str:
     full_path = os.path.join(log_dir, latest_file)
     temp_path = os.path.join(log_dir, "latest_tmp_log.csv")
 
-    # 🚨 Retry copy up to 5 times
     for attempt in range(5):
         try:
             shutil.copy2(full_path, temp_path)
@@ -101,11 +96,7 @@ def find_latest_phi_gpt_log(log_dir: str) -> str:
 
     raise PermissionError(f"Failed to copy log file after 5 attempts: {full_path}")
 
-
 def extract_future_results(log_csv_path, sim_csv_path, zone_name):
-    import pandas as pd
-    from datetime import datetime, timedelta
-
     def zone_to_adu_name(zone_name):
         mapping = {
             "THERMAL ZONE: STORY 1 EAST CORE SPACE": 0,
@@ -162,21 +153,18 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
             raise ValueError(f"Unknown zone name: {zone_name}")
         return "ADU VAV HW RHT" if index == 0 else f"ADU VAV HW RHT {index}"
 
-    # Dynamic variable names
     adu_name = zone_to_adu_name(zone_name)
     terminal_col = f"{adu_name}:Zone Air Terminal Sensible Cooling Energy [J](TimeStep)"
     temp_col = f"{zone_name}:Zone Air Temperature [C](TimeStep)"
     setp_col = f"{zone_name}:Zone Thermostat Cooling Setpoint Temperature [C](TimeStep)"
     outdoor_col = "Environment:Site Outdoor Air Drybulb Temperature [C](TimeStep)"
 
-    # Load log
     df_log = pd.read_csv(log_csv_path)
     last_hour = int(df_log["hour"].iloc[-1])
     last_min = int(df_log["minute"].iloc[-1])
 
-    # Load simulation result
     df_sim = pd.read_csv(sim_csv_path)
-    df_sim.columns = [col.strip('"') for col in df_sim.columns]
+    df_sim.columns = [col.strip().strip('"') for col in df_sim.columns]
 
     def fix_24_hour(dt_str):
         dt_str = dt_str.strip()
@@ -193,56 +181,29 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
 
     anchor_idx = df_sim["delta_to_last"].idxmin()
     target_indices = [anchor_idx + i for i in [1, 2, 3, 4]]
-
     df_future = df_sim.iloc[[i for i in target_indices if i < len(df_sim)]].copy()
 
-    # Extract relevant columns
     result_cols = ["datetime"]
     col_map = {}
 
     for col in [temp_col, setp_col, terminal_col, outdoor_col]:
         if col in df_sim.columns:
-            if "Air Temperature" in col and "Site" in col:
+            if col == outdoor_col:
                 col_map[col] = "T_out"
-            elif "Air Temperature" in col:
+            elif col == temp_col:
                 col_map[col] = "T_in"
-            elif "Cooling Setpoint" in col:
+            elif col == setp_col:
                 col_map[col] = "T_set"
-            elif "Cooling Energy" in col:
+            elif col == terminal_col:
                 col_map[col] = "Energy_J"
             result_cols.append(col)
 
     df_future = df_future[result_cols].rename(columns=col_map)
     return df_future
 
-
-def find_latest_phi_gpt_log_path(log_dir: str) -> str:
-    """
-    Find the most recently modified phi_gpt_log_*.csv file in the given directory or its subdirectories.
-    """
-    candidate_files = []
-
-    for root, _, files in os.walk(log_dir):
-        for f in files:
-            if f.startswith("phi_gpt_log_") and f.endswith(".csv"):
-                full_path = os.path.join(root, f)
-                candidate_files.append(full_path)
-
-    if not candidate_files:
-        raise FileNotFoundError("No phi_gpt_log_*.csv file found in or under log directory.")
-
-    latest_file = max(candidate_files, key=os.path.getmtime)
-    return latest_file
-
-
 def run_feedback_simulation(setpoints, log_path=None, zone_name=None):
-    """
-    Main callable function: runs simulation with given setpoints and returns extracted metrics.
-    If log_path is None, the latest phi_gpt_log_*.csv file will be used.
-    """
     if log_path is None:
         raise ValueError("log_path must be provided (phi_gpt_log_*.csv).")
-
 
     updated_idf_path = update_setpoints_by_time(
         idf_path=idf_in_path,
