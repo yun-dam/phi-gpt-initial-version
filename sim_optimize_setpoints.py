@@ -19,7 +19,7 @@ def evaluate_simulation(seq, log_path=None, zone_name=None,
     """
     df_result = run_feedback_simulation(seq, log_path=log_path, zone_name=zone_name)
     if df_result is None or df_result.empty:
-        return float("inf")
+        return float("inf"), None, None
 
     T_in = df_result["T_in"].values
     Energy_J = df_result["Energy_J"].values
@@ -40,16 +40,20 @@ def evaluate_simulation(seq, log_path=None, zone_name=None,
     normalized_comfort = comfort_penalty / comfort_max
 
     score = w_energy * normalized_energy + w_comfort * normalized_comfort
-    return score
+
+    print(f"🔍 Evaluation Result → Total Score: {score:.4f}, Energy Score: {normalized_energy:.4f}, Comfort Score: {normalized_comfort:.4f}")
+
+    return score, normalized_energy, normalized_comfort
 
 def find_best_setpoint_by_simulation(log_path=None,
                                      zone_name=None,
-                                     w_energy=1.0, w_comfort=1.0):
+                                     w_energy=1.0, w_comfort=3.0):
     """
     Use Genetic Algorithm to find the best 4-step setpoint sequence using normalized score.
     Each simulation uses a copied phi_gpt_log_*.csv inside a unique log directory.
     """
     base_log_path = os.path.abspath("./logs") if log_path is None else os.path.abspath(log_path)
+    best_result = {"score": float("inf")}
 
     def fitness(x):
         seq = [value_map[int(i)] for i in x]
@@ -64,13 +68,26 @@ def find_best_setpoint_by_simulation(log_path=None,
         shutil.copy2(source_log_file, target_log_file)
 
         # 3. 복사된 로그로 시뮬레이션
-        return evaluate_simulation(seq,
-                                   log_path=target_log_file,
-                                   zone_name=zone_name,
-                                   w_energy=w_energy,
-                                   w_comfort=w_comfort)
+        score, energy_score, comfort_score = evaluate_simulation(
+            seq,
+            log_path=target_log_file,
+            zone_name=zone_name,
+            w_energy=w_energy,
+            w_comfort=w_comfort
+        )
 
-    varbound = np.array([[0, 2]] * 4)  # 4-step, each value ∈ {0, 1, 2}
+        # 저장해두기
+        if score < best_result["score"]:
+            best_result.update({
+                "score": score,
+                "energy_score": energy_score,
+                "comfort_score": comfort_score,
+                "seq": seq
+            })
+
+        return score
+
+    varbound = np.array([[0, 2]] * 4)
 
     algorithm_param = {
         'max_num_iteration': 1,
@@ -89,17 +106,15 @@ def find_best_setpoint_by_simulation(log_path=None,
         variable_boundaries=varbound,
         algorithm_parameters=algorithm_param,
         convergence_curve=False,
-        function_timeout=300  # ← 최대 허용 시간 (초 단위)
+        function_timeout=600
     )
     model.run()
 
-    # Extract final result
-    x = model.output_dict["variable"]
-    best_seq = [value_map[int(i)] for i in x]
-    best_score = model.output_dict["function"]
-    return best_seq, best_score
+    return best_result["seq"], best_result["score"], best_result["energy_score"], best_result["comfort_score"]
 
 if __name__ == "__main__":
-    best_seq, score = find_best_setpoint_by_simulation()
+    best_seq, score, energy_score, comfort_score = find_best_setpoint_by_simulation()
     print("\n✅ Best GA Setpoints:", best_seq)
-    print(f"⚖️  Normalized Score: {score:.4f}")
+    print(f"⚖️  Normalized Total Score: {score:.4f}")
+    print(f"🔋 Energy Score: {energy_score:.4f}")
+    print(f"🌡️ Comfort Score: {comfort_score:.4f}")

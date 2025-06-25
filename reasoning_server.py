@@ -6,7 +6,7 @@ from phigpt import phiGPTGenerator
 import os
 from datetime import datetime
 
-zone_name = "THERMAL ZONE: STORY 6 NORTH UPPER PERIMETER SPACE"
+zone_name = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE"
 
 if not zone_name:
     raise ValueError("Zone name must be defined.")
@@ -94,17 +94,21 @@ def handle_request(conn):
             print("[ReasoningServer] ✨ Using MPC optimization (4-step grid search)...")
 
             from sim_optimize_setpoints import find_best_setpoint_by_simulation
-            best_seq, best_score = find_best_setpoint_by_simulation(
+            best_seq, total_score, energy_score, comfort_score = find_best_setpoint_by_simulation(
                 log_path=None,
                 zone_name=zone_name,
                 w_energy=1.0,
-                w_comfort=1.0
+                w_comfort=3.0
+            )
+
+            reason_str = (
+                f"MPC optimization → total={total_score:.2f}, energy={energy_score:.2f}, comfort={comfort_score:.2f}"
             )
 
             result = {
                 "optimal_cooling_setpoints": list(best_seq),
                 "applied_setpoint": best_seq[0],
-                "reason": f"Selected based on MPC optimization (score={best_score:.2f})"
+                "reason": reason_str
             }
 
         else:
