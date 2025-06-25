@@ -23,7 +23,9 @@ def evaluate_simulation(seq, log_path=None, zone_name=None,
 
     T_in = df_result["T_in"].values
     Energy_J = df_result["Energy_J"].values
-    T_out = df_result["T_out"].values if "T_out" in df_result.columns else np.full_like(T_in, 30.0)  # default hot
+    if "T_out" not in df_result.columns:
+        raise KeyError("❌ 'T_out' column is missing from simulation result. Check extract_future_results() or simulation output.")
+    T_out = df_result["T_out"].values
 
     # Comfort penalty only when T_out >= 20°C
     comfort_penalty = 0.0
