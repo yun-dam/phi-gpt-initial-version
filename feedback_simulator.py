@@ -106,7 +106,6 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
     import pandas as pd
     from datetime import datetime, timedelta
 
-    # 🧩 내부에서 zone_to_adu_name 정의
     def zone_to_adu_name(zone_name):
         mapping = {
             "THERMAL ZONE: STORY 1 EAST CORE SPACE": 0,
@@ -163,51 +162,49 @@ def extract_future_results(log_csv_path, sim_csv_path, zone_name):
             raise ValueError(f"Unknown zone name: {zone_name}")
         return "ADU VAV HW RHT" if index == 0 else f"ADU VAV HW RHT {index}"
 
-    # Set dynamic terminal column name
+    # Dynamic variable names
     adu_name = zone_to_adu_name(zone_name)
     terminal_col = f"{adu_name}:Zone Air Terminal Sensible Cooling Energy [J](TimeStep)"
+    temp_col = f"{zone_name}:Zone Air Temperature [C](TimeStep)"
+    setp_col = f"{zone_name}:Zone Thermostat Cooling Setpoint Temperature [C](TimeStep)"
+    outdoor_col = "Environment:Site Outdoor Air Drybulb Temperature [C](TimeStep)"
 
-    # Load log file
+    # Load log
     df_log = pd.read_csv(log_csv_path)
     last_hour = int(df_log["hour"].iloc[-1])
     last_min = int(df_log["minute"].iloc[-1])
 
-    # Load simulation CSV
+    # Load simulation result
     df_sim = pd.read_csv(sim_csv_path)
     df_sim.columns = [col.strip('"') for col in df_sim.columns]
 
-    # Fix 24:00:00
     def fix_24_hour(dt_str):
         dt_str = dt_str.strip()
         if "24:00:00" in dt_str:
             date_part = dt_str.split()[0]
-            new_dt = datetime.strptime(date_part + " 00:00:00", "%m/%d %H:%M:%S") + timedelta(days=1)
-        else:
-            new_dt = datetime.strptime(dt_str, "%m/%d %H:%M:%S")
-        return new_dt
+            return datetime.strptime(date_part + " 00:00:00", "%m/%d %H:%M:%S") + timedelta(days=1)
+        return datetime.strptime(dt_str, "%m/%d %H:%M:%S")
 
     df_sim["datetime"] = df_sim["Date/Time"].apply(fix_24_hour)
 
-    # Match target time
     target_min = last_hour * 60 + last_min
     df_sim["delta_min"] = df_sim["datetime"].dt.hour * 60 + df_sim["datetime"].dt.minute
     df_sim["delta_to_last"] = abs(df_sim["delta_min"] - target_min)
 
     anchor_idx = df_sim["delta_to_last"].idxmin()
-    target_indices = [anchor_idx + i for i in [1, 2, 3, 4]]  # +30, 60, 90, 120 mins
+    target_indices = [anchor_idx + i for i in [1, 2, 3, 4]]
 
     df_future = df_sim.iloc[[i for i in target_indices if i < len(df_sim)]].copy()
 
-    # Extract columns
-    temp_col = f"{zone_name}:Zone Air Temperature [C](TimeStep)"
-    setp_col = f"{zone_name}:Zone Thermostat Cooling Setpoint Temperature [C](TimeStep)"
-
+    # Extract relevant columns
     result_cols = ["datetime"]
     col_map = {}
 
-    for col in [temp_col, setp_col, terminal_col]:
+    for col in [temp_col, setp_col, terminal_col, outdoor_col]:
         if col in df_sim.columns:
-            if "Air Temperature" in col:
+            if "Air Temperature" in col and "Site" in col:
+                col_map[col] = "T_out"
+            elif "Air Temperature" in col:
                 col_map[col] = "T_in"
             elif "Cooling Setpoint" in col:
                 col_map[col] = "T_set"
