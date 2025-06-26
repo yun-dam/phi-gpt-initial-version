@@ -92,8 +92,8 @@ def find_best_setpoint_by_simulation(log_path=None,
     varbound = np.array([[0, 2]] * 4)
 
     algorithm_param = {
-        'max_num_iteration': 1,
-        'population_size': 1,
+        'max_num_iteration': 6,
+        'population_size': 8,
         'mutation_probability': 0.2,
         'elit_ratio': 0.2,
         'crossover_probability': 0.6,
