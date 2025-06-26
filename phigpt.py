@@ -522,6 +522,7 @@ class phiGPTRetriever:
             rows = []
             prev_indoor = None
             prev_outdoor = None
+            print(series)
             for hour, (out_c, inn_c, setp_c, energy_j) in enumerate(series):
                 delta1 = round(inn_c - setp_c, 2)
                 delta2 = round(inn_c - prev_indoor, 2) if prev_indoor is not None else "N/A"
