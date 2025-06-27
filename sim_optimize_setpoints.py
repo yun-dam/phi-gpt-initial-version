@@ -10,7 +10,7 @@ ALLOWED_SETPOINTS = [22.0, 23.0, 24.0]
 value_map = {0: 22.0, 1: 23.0, 2: 24.0}
 
 def evaluate_simulation(seq, log_path=None, zone_name=None,
-                        w_energy=1.0, w_comfort=1.0,
+                        w_energy=1.0, w_comfort=7.0,
                         target_min=22.5, target_max=23.5,
                         energy_norm_base=1_000_000.0, comfort_max=4.0):
     """
@@ -49,7 +49,7 @@ def evaluate_simulation(seq, log_path=None, zone_name=None,
 
 def find_best_setpoint_by_simulation(log_path=None,
                                      zone_name=None,
-                                     w_energy=1.0, w_comfort=3.0):
+                                     w_energy=1.0, w_comfort=7.0):
     """
     Use Genetic Algorithm to find the best 4-step setpoint sequence using normalized score.
     Each simulation uses a copied phi_gpt_log_*.csv inside a unique log directory.

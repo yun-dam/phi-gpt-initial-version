@@ -32,7 +32,7 @@ generator = phiGPTGenerator(
 )
 
 
-control_mode = "mpc" #textgrad, mpc, llm
+control_mode = "textgrad" #textgrad, mpc, llm
 
 HOST = '127.0.0.1'
 PORT = 55555
@@ -98,7 +98,7 @@ def handle_request(conn):
                 log_path=None,
                 zone_name=zone_name,
                 w_energy=1.0,
-                w_comfort=3.0
+                w_comfort=20.0
             )
 
             reason_str = (
