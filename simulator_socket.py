@@ -86,7 +86,7 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.zone = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE"
         self.state_buffer = deque(maxlen=12)
 
-        self.use_fixed_setpoint = False
+        self.use_fixed_setpoint = True
         self.fixed_setpoint_value = 23.0
         self.use_deadband_mode = False
         self.deadband_center = 23.0

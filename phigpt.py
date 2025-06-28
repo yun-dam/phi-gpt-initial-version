@@ -472,20 +472,18 @@ class phiGPTRetriever:
             indoor_change = outdoor_change = 0.0
 
         query = (
-            f"Searching for cooling strategies under the following conditions:\n\n"
-            f"→ Current system state (most recent timestep):\n"
-            f"- Outdoor temperature: {curr_out}°C ({outdoor_trend}, Δ={outdoor_change})\n"
-            f"- Indoor temperature: {curr_inn}°C ({indoor_trend}, Δ={indoor_change})\n"
-            f"- Cooling setpoint: {curr_setp}°C ({setpoint_trend})\n"
+            f"Cooling strategies under the following conditions:\n"
+            f"- Outdoor temperature: {curr_out}°C, trend: {outdoor_trend}, Δ={outdoor_change}\n"
+            f"- Indoor temperature: {curr_inn}°C, trend: {indoor_trend}, Δ={indoor_change}\n"
+            f"- Cooling setpoint: {curr_setp}°C, trend: {setpoint_trend}\n"
             f"- Indoor - setpoint difference: {curr_delta}°C\n"
-            f"- Target indoor temperature: {target_indoor}°C (Δ={to_target}°C from current)\n\n"
-            f"→ Average over last {num_timesteps} timesteps:\n"
+            f"- Target indoor temp delta: {to_target}°C\n"
             f"- Avg outdoor temp: {avg_out}°C\n"
             f"- Avg indoor temp: {avg_inn}°C\n"
             f"- Avg setpoint: {avg_setp}°C\n"
-            f"- Avg indoor-setpoint difference: {avg_delta}°C\n\n"
-            f"Looking for cooling control strategies that reduce energy use while maintaining thermal comfort."
+            f"- Avg indoor-setpoint delta: {avg_delta}°C\n"
         )
+        
         return query
 
     def get_relevant_pdf_text(self, current_states):
