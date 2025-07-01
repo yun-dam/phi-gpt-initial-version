@@ -2,21 +2,29 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 파일 리스트와 레이블 정의 (줄바꿈 포함)
-
-file_paths = ["socket_fixed.csv", "socket_MPC_July1.csv", "socket_Text.csv", "socket_text_time.csv"]
+file_paths = [
+    "socket_fixed.csv",
+    "socket_fixed24.csv",
+    "socket_MPC_July1.csv",
+    "socket_Text.csv",
+    "socket_text_time.csv"
+]
 
 labels = [
-    "Fixed",
+    "Fixed\n(23℃)",
+    "Fixed\n(24℃)",
     "MPC",
     "phiGPT\n(Text only)",
     "phiGPT\n(Text+Time)"
 ]
-patterns = ['.', 'x', '/', '\\']
-colors = ['gray', 'red', 'skyblue', 'blue']
+
+patterns = ['.', 'x', '/', '\\', 'o']
+colors = ['gray', 'lightgray', 'red', 'skyblue', 'blue']
 
 # 측정 대상 컬럼
 datetime_col = "Date/Time"
 energy_col = "ADU VAV HW RHT 47:Zone Air Terminal Sensible Cooling Energy [J](TimeStep)"
+temp_col = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE:Zone Air Temperature [C](TimeStep)"
 pmv_col = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE:Zone Thermal Comfort Fanger Model PMV [](TimeStep)"
 
 # 결과 저장
@@ -29,26 +37,32 @@ for file in file_paths:
     df["datetime"] = pd.to_datetime(df[datetime_col], format="%m/%d %H:%M:%S", errors="coerce")
     df = df.dropna(subset=["datetime"])
 
-    # 기준 시간: 첫째 날의 06시
+    # 기준 시간: 첫째 날의 06시부터
     start_date = df["datetime"].dt.date.min()
-    cutoff_time = pd.Timestamp.combine(start_date, pd.to_datetime("06:00:00").time())
-    df = df[df["datetime"] >= cutoff_time]
+    start_time = pd.Timestamp.combine(start_date, pd.to_datetime("06:00:00").time())
+    df = df[df["datetime"] >= start_time]
 
     # 수치 변환
     df[energy_col] = pd.to_numeric(df[energy_col], errors='coerce')
+    df[temp_col] = pd.to_numeric(df[temp_col], errors='coerce')
     df[pmv_col] = pd.to_numeric(df[pmv_col], errors='coerce')
 
     total_kwh = df[energy_col].sum() / 3600000  # J → kWh
     energy_kwh_totals.append(total_kwh)
 
-    total_steps = df[pmv_col].notna().sum()
-    violations = (df[pmv_col].abs() >= 1.0).sum()
+    # 🕒 6시~22시까지만 필터링
+    df["hour"] = df["datetime"].dt.hour
+    df_comfort = df[(df["hour"] >= 6) & (df["hour"] < 22)]
+
+    # PMV comfort violation (|PMV| ≥ 1.0)
+    total_steps = df_comfort[pmv_col].notna().sum()
+    violations = (df_comfort[pmv_col].abs() >= 1.0).sum()
     violation_rate = (violations / total_steps) * 100 if total_steps > 0 else 0
     pmv_violation_rates.append(violation_rate)
 
-# 기준값 (Case #1 = Fixed)
+# 기준값 (Case #1 = Fixed 23℃)
 base_energy = energy_kwh_totals[0]
-base_pmv = pmv_violation_rates[0]
+base_violation = pmv_violation_rates[0]
 
 # 출력
 print("=== Cooling Energy (kWh) from 06:00 ===")
@@ -60,11 +74,11 @@ for i, label in enumerate(labels):
     else:
         print()
 
-print("\n=== PMV Violation Rate (%) from 06:00 ===")
+print("\n=== PMV Violation Rate (%) from 06:00 to 22:00 ===")
 for i, label in enumerate(labels):
     print(f"{label.replace(chr(10), ' ')}: {pmv_violation_rates[i]:.2f} %", end='')
     if i > 0:
-        delta = (pmv_violation_rates[i] - base_pmv) / base_pmv * 100 if base_pmv != 0 else float('inf')
+        delta = (pmv_violation_rates[i] - base_violation) / base_violation * 100 if base_violation != 0 else float('inf')
         print(f"   (Δ {delta:+.2f}%)")
     else:
         print()
@@ -95,5 +109,5 @@ axs[1].tick_params(axis='y', labelsize=18)
 axs[1].set_ylim(0, max(pmv_violation_rates) * 1.1)
 
 plt.tight_layout(pad=1.2, w_pad=1.0)
-plt.savefig("energy_pmv_from_06am_precise.png", dpi=300, bbox_inches='tight')
+plt.savefig("energy_pmv_violation_6to22.png", dpi=300, bbox_inches='tight')
 plt.show()

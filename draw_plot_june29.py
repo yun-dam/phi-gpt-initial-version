@@ -1,9 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import os
+
+# ✅ CSV 파일 경로
+csv_path = "socket_text_time.csv"
+filename_base = os.path.splitext(os.path.basename(csv_path))[0] 
 
 # Load and clean datetime
-df = pd.read_csv("socket_MPC_July1.csv")
+df = pd.read_csv(csv_path)
 df["Date/Time"] = df["Date/Time"].str.strip().str.replace(" 24:", " 00:")
 mask_24 = df["Date/Time"].str.contains(" 00:") & df.duplicated("Date/Time", keep=False)
 df.loc[mask_24, "Date/Time"] = pd.to_datetime(df.loc[mask_24, "Date/Time"], format="%m/%d %H:%M:%S") + pd.Timedelta(days=1)
@@ -26,20 +31,14 @@ day_boundaries = df_filtered.groupby("date_only")["datetime"].min().tolist()
 # ❗ Shift setpoint one timestep forward (i.e., T₁ setpoint is drawn at T₀)
 df_filtered["setpoint_shifted"] = df_filtered[setpoint_col].shift(-1)
 
-# Plot
+# Plot 전체 기간
 plt.figure(figsize=(16, 6))
-
-# 온도 연속 곡선
 plt.plot(df_filtered["datetime"], df_filtered[temp_col], color="tab:red", label="Zone Air Temperature")
-
-# 세트포인트 점선 스텝 (shift 적용)
 plt.step(df_filtered["datetime"], df_filtered["setpoint_shifted"], color="tab:blue", linestyle='--', where='post', label="Cooling Setpoint")
 
-# 날짜 경계선
 for boundary in day_boundaries:
     plt.axvline(x=boundary, color='black', linestyle='--', linewidth=1)
 
-# 첫날 06시 진한선 및 라벨+화살표
 start_time = pd.Timestamp(df_filtered["date_only"].iloc[0]) + pd.Timedelta(hours=6)
 plt.axvline(x=start_time, color='black', linestyle='-', linewidth=2.5)
 plt.annotate('→ Control starts',
@@ -47,14 +46,10 @@ plt.annotate('→ Control starts',
              textcoords='data',
              fontsize=16, fontname="Arial", color="black", ha='left', va='center')
 
-# X축 설정
 plt.gca().xaxis.set_major_locator(mdates.HourLocator(byhour=[0, 6, 12, 18]))
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Hh'))
-
-# X축 범위 조정 (공백 제거)
 plt.xlim(df_filtered["datetime"].min(), df_filtered["datetime"].max())
 
-# 스타일
 plt.xlabel("Time of Day", fontsize=20, fontname="Arial")
 plt.ylabel("Temperature [°C]", fontsize=20, fontname="Arial")
 plt.xticks(fontsize=20, fontname="Arial")
@@ -63,11 +58,11 @@ plt.ylim(19, 25.5)
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.legend(fontsize=18, loc='upper right')
 plt.tight_layout()
-plt.savefig("mpc_new.png", dpi=300)
 
+plt.savefig(f"{filename_base}.png", dpi=300)
 plt.show()
 
-
+# Plot 둘째 날만
 second_day = df_filtered["date_only"].unique()[2]
 df_day2 = df_filtered[df_filtered["date_only"] == second_day]
 
@@ -83,5 +78,6 @@ plt.ylim(19, 25.5)
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.legend(fontsize=18, loc='upper right')
 plt.tight_layout()
-plt.savefig("mpc_day.png", dpi=300)
+
+plt.savefig(f"{filename_base}_day2.png", dpi=300)
 plt.show()
