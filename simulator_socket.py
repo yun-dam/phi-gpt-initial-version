@@ -63,7 +63,7 @@ def zone_to_adu_name(zone_name):
         "THERMAL ZONE: STORY 6 NORTH UPPER PERIMETER SPACE": 44,
         "THERMAL ZONE: STORY 6 SOUTH PERIMETER SPACE": 45,
         "THERMAL ZONE: STORY 6 WEST CORE SPACE": 46,
-        "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE": 47,
+        "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE": 47, 
     }
     index = mapping.get(zone_name.upper())
     if index is not None:
@@ -73,7 +73,51 @@ def zone_to_adu_name(zone_name):
             return f"ADU VAV HW Rht {index}"
     else:
         raise ValueError(f"Unknown zone name: {zone_name}")
-        
+
+SETPOINT_SEQUENCE_10MIN = [
+    24, 24, 24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 22, 22, 22,
+    22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
+    22, 22, 22, 22, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24,
+    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23,
+    23, 23, 24, 24, 24, 22, 22, 22, 22, 22, 22, 22, 22, 22, 24, 24, 24, 22, 22,
+    22, 24, 24, 24, 24, 24, 24, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 22, 22, 22, 23, 23, 23, 23, 23, 23, 24,
+    24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    24, 24, 23, 23, 23, 23, 23, 23, 24, 24, 24, 22, 22, 22, 22, 22, 22, 24, 24,
+    24, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    24, 24, 24, 24, 23, 23, 23, 24, 24, 24, 23, 23, 23, 24, 24, 24, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 24, 24, 24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24,
+    24, 24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24,
+    24, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23,
+    23, 23, 24, 24, 24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 22, 22, 22, 22, 22,
+    22, 24, 24, 24, 23, 23, 23, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 24, 24, 24, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
+    22, 22, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    24, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24,
+    24, 24, 24, 24, 24, 24, 23, 23, 23, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 22, 22, 22, 24, 24, 24, 24, 24,
+    24, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 23, 23, 23, 22, 22, 22, 22,
+    22, 22, 23, 23, 23, 24, 24, 24, 24, 24, 24, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23,
+    23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    24, 24, 24, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    24, 24, 24, 24, 24, 24, 24, 24
+]
+
+# Derive 30-minute interval control sequence
+SETPOINT_SEQUENCE_30MIN_CUSTOM = SETPOINT_SEQUENCE_10MIN[::3]
+
 class phiGPTSimulator(EnergyPlusPlugin):
     def __init__(self):
         super().__init__()
@@ -86,7 +130,8 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.zone = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE"
         self.state_buffer = deque(maxlen=12)
 
-        self.use_fixed_setpoint = True
+        self.use_fixed_sequence_mode = False
+        self.use_fixed_setpoint = False
         self.fixed_setpoint_value = 23.0
         self.use_deadband_mode = False
         self.deadband_center = 23.0
@@ -177,6 +222,37 @@ class phiGPTSimulator(EnergyPlusPlugin):
         T_out = self.api.exchange.get_variable_value(state, self.T_out_handle)
         T_in = self.api.exchange.get_variable_value(state, self.T_in_handle)
         PMV = self.api.exchange.get_variable_value(state, self.pmv_handle)
+
+        # New fixed sequence mode (10-min step by step)
+        if self.use_fixed_sequence_mode:
+            if not hasattr(self, 'sequence_index'):
+                self.sequence_index = 0
+
+            if self.sequence_index < len(SETPOINT_SEQUENCE_10MIN):
+                current_setpoint = SETPOINT_SEQUENCE_10MIN[self.sequence_index]
+                reason = f"Fixed sequence mode: index={self.sequence_index}"
+            else:
+                current_setpoint = SETPOINT_SEQUENCE_10MIN[-1]
+                reason = f"Index {self.sequence_index} out of range, fallback to last"
+
+            self.api.exchange.set_actuator_value(state, self.cooling_handle, current_setpoint)
+            self.sequence_index += 1  # advance index at each timestep
+
+            cooling_energy = self.api.exchange.get_variable_value(state, self.cooling_energy_handle)
+            try:
+                with open(self.log_path, mode="a", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow([
+                        month, day, hour, minute,
+                        round(T_out, 2), round(T_in, 2), round(current_setpoint, 2),
+                        round(PMV, 2), round(cooling_energy, 2), reason
+                    ])
+            except Exception as e:
+                self.api.runtime.issue_severe(state, f"[phiGPT] ❌ Failed to write log: {e}")
+
+            self.api.runtime.issue_warning(state, f"[phiGPT] 🟢 Applied setpoint {current_setpoint} at {hour}:{minute:02d} | Reason: {reason}")
+            return 0
+
 
         if (hour, minute) != self.last_buffer_update and minute in (0, 30):
             T_set = self.api.exchange.get_actuator_value(state, self.cooling_handle)

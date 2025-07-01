@@ -10,46 +10,35 @@ ALLOWED_SETPOINTS = [22.0, 23.0, 24.0]
 value_map = {0: 22.0, 1: 23.0, 2: 24.0}
 
 def evaluate_simulation(seq, log_path=None, zone_name=None,
-                        w_energy=1.0, w_comfort=7.0,
+                        w_energy=1.0, w_comfort=3.0,
                         target_min=22.5, target_max=23.5,
-                        energy_norm_base=1_000_000.0, comfort_max=4.0):
-    """
-    Evaluate a 4-step setpoint sequence using EnergyPlus simulation with normalized scoring.
-    Applies comfort penalty only when outdoor temperature is 20°C or higher.
-    """
+                        energy_norm_base=1_000_000.0, comfort_max=4.0):  
     df_result = run_feedback_simulation(seq, log_path=log_path, zone_name=zone_name)
     if df_result is None or df_result.empty:
         return float("inf"), None, None
 
     T_in = df_result["T_in"].values
     Energy_J = df_result["Energy_J"].values
-    if "T_out" not in df_result.columns:
-        raise KeyError("❌ 'T_out' column is missing from simulation result. Check extract_future_results() or simulation output.")
     T_out = df_result["T_out"].values
 
-    # Comfort penalty only when T_out >= 20°C
-    comfort_penalty = 0.0
-    for t_in, t_out in zip(T_in, T_out):
-        if t_out >= 20.0:
-            comfort_penalty += (
-                max(0, target_min - t_in) ** 2 + max(0, t_in - target_max) ** 2
-            )
+    # 🔧 Comfort penalty: linearly weighted absolute deviation
+    comfort_slope = 5.0  # 선형 가중치 계수 (내부 고정)
+    comfort_penalty = sum(
+        comfort_slope * (max(0, target_min - t_in) + max(0, t_in - target_max))
+        for t_in, t_out in zip(T_in, T_out) if t_out >= 20.0
+    )
 
     total_energy = np.sum(Energy_J)
-
-    # Normalized scores
     normalized_energy = total_energy / energy_norm_base
     normalized_comfort = comfort_penalty / comfort_max
-
     score = w_energy * normalized_energy + w_comfort * normalized_comfort
 
     print(f"🔍 Evaluation Result → Total Score: {score:.4f}, Energy Score: {normalized_energy:.4f}, Comfort Score: {normalized_comfort:.4f}")
-
     return score, normalized_energy, normalized_comfort
 
 def find_best_setpoint_by_simulation(log_path=None,
                                      zone_name=None,
-                                     w_energy=1.0, w_comfort=7.0):
+                                     w_energy=1.0, w_comfort=1.5):
     """
     Use Genetic Algorithm to find the best 4-step setpoint sequence using normalized score.
     Each simulation uses a copied phi_gpt_log_*.csv inside a unique log directory.

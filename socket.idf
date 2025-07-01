@@ -32,7 +32,7 @@ ZoneVentilation:DesignFlowRate,
     ,                        !- Maximum Outdoor Temperature Schedule Name
     40;                      !- Maximum Wind Speed {m/s}
 
-Output:Variable,*,Zone Thermal Comfort Fanger Model PMV,Timestep;
+Output:Variable,Thermal Zone: Story 6 West Perimeter Space,Zone Thermal Comfort Fanger Model PMV,Timestep;
 
 Schedule:Compact,
     AirVelocitySchedule,     !- Name
@@ -165,8 +165,7 @@ EnergyManagementSystem:Sensor,
     THERMAL ZONE: STORY 6 WEST PERIMETER SPACE,  !- Output:Variable or Output:Meter Index Key Name
     Zone Mean Air Temperature;  !- Output:Variable or Output:Meter Name
 
-Output:Variable,*,Zone Thermostat Cooling Setpoint Temperature,Timestep;
-Output:Variable,*,Zone Thermostat Heating Setpoint Temperature,Timestep;
+Output:Variable,Thermal Zone: Story 6 West Perimeter Space,Zone Thermostat Cooling Setpoint Temperature,Timestep;
 Schedule:Constant,DualSetpointControl,Thermal Zone: Story 1 East Lower Perimeter Space Thermostat Schedule Type Limits,4;
 
 Schedule:Compact,
@@ -83312,14 +83311,12 @@ OutputControl:ReportingTolerances,
     0.2,                     !- Tolerance for Time Heating Setpoint Not Met {deltaC}
     0.2;                     !- Tolerance for Time Cooling Setpoint Not Met {deltaC}
 
-Output:Variable,*,Zone Air Terminal VAV Damper Position,Timestep;
-Output:Variable,*,Zone Air Terminal Sensible Heating Energy,Timestep;
+Output:Variable,Thermal Zone: Story 6 West Perimeter Space,Zone Air Terminal VAV Damper Position,Timestep;
 Output:Variable,*,Zone Air Terminal Sensible Cooling Energy,Timestep;
-Output:Variable,*,System Node Mass Flow Rate,Timestep;
-Output:Variable,*,System Node Temperature,Timestep;
-Output:Variable,*,District Cooling Water Energy,Timestep;
+Output:Variable,Thermal Zone: Story 6 West Perimeter Space,System Node Mass Flow Rate,Timestep;
+Output:Variable,Thermal Zone: Story 6 West Perimeter Space,System Node Temperature,Timestep;
 Output:Variable,*,Site Outdoor Air Drybulb Temperature,Timestep;
-Output:Variable,*,Zone Air Temperature,Timestep;
+Output:Variable,Thermal Zone: Story 6 West Perimeter Space,Zone Air Temperature,Timestep;
 Output:Meter,Electricity:HVAC,Timestep;
 Output:Meter,Electricity:Building,Timestep;
 Output:Meter,Electricity:Facility,Timestep;
