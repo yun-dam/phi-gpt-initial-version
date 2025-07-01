@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # Load and clean datetime
-df = pd.read_csv("socket_fixed.csv")
+df = pd.read_csv("socket_MPC_July1.csv")
 df["Date/Time"] = df["Date/Time"].str.strip().str.replace(" 24:", " 00:")
 mask_24 = df["Date/Time"].str.contains(" 00:") & df.duplicated("Date/Time", keep=False)
 df.loc[mask_24, "Date/Time"] = pd.to_datetime(df.loc[mask_24, "Date/Time"], format="%m/%d %H:%M:%S") + pd.Timedelta(days=1)
@@ -23,26 +23,29 @@ df_filtered = df[df["datetime"].dt.time != pd.to_datetime("00:00:00").time()].co
 df_filtered["date_only"] = df_filtered["datetime"].dt.date
 day_boundaries = df_filtered.groupby("date_only")["datetime"].min().tolist()
 
+# ❗ Shift setpoint one timestep forward (i.e., T₁ setpoint is drawn at T₀)
+df_filtered["setpoint_shifted"] = df_filtered[setpoint_col].shift(-1)
+
 # Plot
 plt.figure(figsize=(16, 6))
 
 # 온도 연속 곡선
-plt.plot(df_filtered["datetime"], df_filtered[temp_col], color="tab:red", label="Zone Temperature")
+plt.plot(df_filtered["datetime"], df_filtered[temp_col], color="tab:red", label="Zone Air Temperature")
 
-# 세트포인트 점선 스텝
-plt.step(df_filtered["datetime"], df_filtered[setpoint_col], color="tab:blue", linestyle='--', where='post', label="Cooling Setpoint")
+# 세트포인트 점선 스텝 (shift 적용)
+plt.step(df_filtered["datetime"], df_filtered["setpoint_shifted"], color="tab:blue", linestyle='--', where='post', label="Cooling Setpoint")
 
 # 날짜 경계선
 for boundary in day_boundaries:
     plt.axvline(x=boundary, color='black', linestyle='--', linewidth=1)
 
-# # 날짜 라벨
-# for date in day_boundaries:
-#     noon_time = pd.Timestamp(date) + pd.Timedelta(hours=12)
-#     if noon_time in df_filtered["datetime"].values:
-#         plt.text(noon_time, df_filtered[temp_col].max() + 0.3,
-#                  pd.Timestamp(date).strftime('%m-%d'),
-#                  ha='center', va='bottom', fontsize=18, fontname="Arial")
+# 첫날 06시 진한선 및 라벨+화살표
+start_time = pd.Timestamp(df_filtered["date_only"].iloc[0]) + pd.Timedelta(hours=6)
+plt.axvline(x=start_time, color='black', linestyle='-', linewidth=2.5)
+plt.annotate('→ Control starts',
+             xy=(start_time, 25), xytext=(start_time + pd.Timedelta(hours=0.5), 25),
+             textcoords='data',
+             fontsize=16, fontname="Arial", color="black", ha='left', va='center')
 
 # X축 설정
 plt.gca().xaxis.set_major_locator(mdates.HourLocator(byhour=[0, 6, 12, 18]))
@@ -52,14 +55,33 @@ plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Hh'))
 plt.xlim(df_filtered["datetime"].min(), df_filtered["datetime"].max())
 
 # 스타일
-# plt.title("Zone Air Temperature and Cooling Setpoint", fontsize=24, fontname="Arial")
 plt.xlabel("Time of Day", fontsize=20, fontname="Arial")
 plt.ylabel("Temperature [°C]", fontsize=20, fontname="Arial")
 plt.xticks(fontsize=20, fontname="Arial")
 plt.yticks(fontsize=20, fontname="Arial")
-plt.ylim(19, 25)
+plt.ylim(19, 25.5)
 plt.grid(True, linestyle='--', alpha=0.5)
-plt.legend(fontsize=18)
+plt.legend(fontsize=18, loc='upper right')
 plt.tight_layout()
+plt.savefig("mpc_new.png", dpi=300)
+
 plt.show()
-plt.savefig("fixed_june29.png", dpi=300)
+
+
+second_day = df_filtered["date_only"].unique()[2]
+df_day2 = df_filtered[df_filtered["date_only"] == second_day]
+
+plt.figure(figsize=(16, 6))
+plt.plot(df_day2["datetime"], df_day2[temp_col], color="tab:red", label="Zone Air Temperature")
+plt.step(df_day2["datetime"], df_day2["setpoint_shifted"], color="tab:blue", linestyle='--', where='post', label="Cooling Setpoint")
+
+plt.xlabel("Time of Day", fontsize=20, fontname="Arial")
+plt.ylabel("Temperature [°C]", fontsize=20, fontname="Arial")
+plt.xticks(fontsize=20, fontname="Arial")
+plt.yticks(fontsize=20, fontname="Arial")
+plt.ylim(19, 25.5)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend(fontsize=18, loc='upper right')
+plt.tight_layout()
+plt.savefig("mpc_day.png", dpi=300)
+plt.show()
