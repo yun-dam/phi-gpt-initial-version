@@ -471,17 +471,27 @@ class phiGPTRetriever:
             indoor_trend = outdoor_trend = setpoint_trend = "unknown"
             indoor_change = outdoor_change = 0.0
 
+        # query = (
+        #     f"Cooling strategies under the following conditions:\n"
+        #     f"- Outdoor temperature: {curr_out}°C, trend: {outdoor_trend}, Δ={outdoor_change}\n"
+        #     f"- Indoor temperature: {curr_inn}°C, trend: {indoor_trend}, Δ={indoor_change}\n"
+        #     f"- Cooling setpoint: {curr_setp}°C, trend: {setpoint_trend}\n"
+        #     f"- Indoor - setpoint difference: {curr_delta}°C\n"
+        #     f"- Target indoor temp delta: {to_target}°C\n"
+        #     f"- Avg outdoor temp: {avg_out}°C\n"
+        #     f"- Avg indoor temp: {avg_inn}°C\n"
+        #     f"- Avg setpoint: {avg_setp}°C\n"
+        #     f"- Avg indoor-setpoint delta: {avg_delta}°C\n"
+        # )
+
         query = (
-            f"Cooling strategies under the following conditions:\n"
-            f"- Outdoor temperature: {curr_out}°C, trend: {outdoor_trend}, Δ={outdoor_change}\n"
-            f"- Indoor temperature: {curr_inn}°C, trend: {indoor_trend}, Δ={indoor_change}\n"
-            f"- Cooling setpoint: {curr_setp}°C, trend: {setpoint_trend}\n"
-            f"- Indoor - setpoint difference: {curr_delta}°C\n"
-            f"- Target indoor temp delta: {to_target}°C\n"
-            f"- Avg outdoor temp: {avg_out}°C\n"
-            f"- Avg indoor temp: {avg_inn}°C\n"
-            f"- Avg setpoint: {avg_setp}°C\n"
-            f"- Avg indoor-setpoint delta: {avg_delta}°C\n"
+            f"Guidance on energy-efficient HVAC cooling strategies. "
+            f"Consider a scenario with a rising thermal load: "
+            f"The indoor temperature is at {curr_inn:.1f}°C and is currently {indoor_trend}. "
+            f"The outdoor temperature is at {curr_out:.1f}°C and is also {outdoor_trend}. "
+            f"The indoor temperature is already {curr_delta:.1f}°C above its setpoint. "
+            f"What is the optimal setpoint adjustment strategy to reduce energy consumption "
+            f"while ensuring the indoor temperature remains within a comfortable range?"
         )
         
         return query
