@@ -502,7 +502,7 @@ class phiGPTRetriever:
         sim_docs = self.vectorstore_simulation.similarity_search(str(current_vector), k=top_k)
 
         parsed_sim = [ast.literal_eval(doc.page_content) for doc in sim_docs]
-        sim_text = self.format_state_series_table(parsed_sim, label="Simulation", is_nested=True)
+        sim_text = self.format_state_series_table(parsed_sim, label="Measurement", is_nested=True)
 
         # meas_docs = self.vectorstore_measurement.similarity_search(str(current_vector), k=top_k)
         # parsed_meas = [ast.literal_eval(lst) for lst in "\n\n".join(d.page_content for d in meas_docs).strip().split('\n\n')]
