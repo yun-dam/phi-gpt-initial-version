@@ -131,8 +131,8 @@ class phiGPTSimulator(EnergyPlusPlugin):
         self.state_buffer = deque(maxlen=12)
 
         self.use_fixed_sequence_mode = False
-        self.use_fixed_setpoint = True
-        self.fixed_setpoint_value = 24.0
+        self.use_fixed_setpoint = False
+        self.fixed_setpoint_value = 23.0
         self.use_deadband_mode = False
         self.deadband_center = 23.0
         self.deadband_range = 0.3

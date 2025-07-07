@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 zone_name = "THERMAL ZONE: STORY 6 WEST PERIMETER SPACE"
-control_mode = "mpc"  # Options: "textgrad", "mpc", "llm"
+control_mode = "textgrad"  # Options: "textgrad", "mpc", "llm"
 
 HOST = '127.0.0.1'
 PORT = 55555

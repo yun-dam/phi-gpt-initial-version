@@ -485,13 +485,15 @@ class phiGPTRetriever:
         # )
 
         query = (
+
             f"Guidance on energy-efficient HVAC cooling strategies. "
-            f"Consider a scenario with a rising thermal load: "
-            f"The indoor temperature is at {curr_inn:.1f}°C and is currently {indoor_trend}. "
-            f"The outdoor temperature is at {curr_out:.1f}°C and is also {outdoor_trend}. "
-            f"The indoor temperature is already {curr_delta:.1f}°C above its setpoint. "
+            f"Consider the following current conditions: "
+            f"The indoor temperature is {curr_inn:.1f}°C and is currently {indoor_trend}. "
+            f"The outdoor temperature is {curr_out:.1f}°C and is also {outdoor_trend}. "
+            f"The indoor temperature is {curr_delta:.1f}°C {'above' if curr_delta > 0 else 'below'} the current setpoint. "
             f"What is the optimal setpoint adjustment strategy to reduce energy consumption "
             f"while ensuring the indoor temperature remains within a comfortable range?"
+        
         )
         
         return query

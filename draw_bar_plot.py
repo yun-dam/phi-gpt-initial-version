@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 # 파일 리스트와 레이블 정의 (줄바꿈 포함)
 file_paths = [
     "socket_fixed.csv",
-    "socket_fixed24.csv",
+    "socket_fixed.csv",
     "socket_MPC_July1.csv",
-    "socket_Text.csv",
-    "socket_text_time_july2.csv"
+    "socket_text_july4.csv",
+    "socket_text_time_july4.csv"
 ]
 
 labels = [
